@@ -27,6 +27,8 @@ typedef enum tagIETargetDeviceType {
     IE_GPU = 3,
     IE_FPGA = 4,
     IE_MYRIAD = 5,
+    IE_HDDL = 6,
+    IE_GNA = 7,
     IE_HETERO = 8
 }IETargetDeviceType;
 

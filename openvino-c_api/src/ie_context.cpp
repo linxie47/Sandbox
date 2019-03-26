@@ -464,6 +464,10 @@ InferenceEngine::TargetDevice CIEContext::getDeviceFromId(IETargetDeviceType dev
         return InferenceEngine::TargetDevice::eFPGA;
     case IE_MYRIAD:
         return InferenceEngine::TargetDevice::eMYRIAD;
+    case IE_HDDL:
+        return InferenceEngine::TargetDevice::eHDDL;
+    case IE_GNA:
+        return InferenceEngine::TargetDevice::eGNA;
     case IE_HETERO:
         return InferenceEngine::TargetDevice::eHETERO;
     default:
