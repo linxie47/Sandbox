@@ -157,12 +157,12 @@ typedef struct tagIEInputOutputInfo {
 * @brief image input data for the inference engine supports
 */
 typedef struct tagIEData {
-    void * buffer;
+#define NUM_DATA_POINTS 4
+    unsigned char *data[NUM_DATA_POINTS];  // pointers to picture planes
+    int        linesize[NUM_DATA_POINTS];  // size in bytes of each picture line
     unsigned int size;  //byte size
     unsigned int width;
     unsigned int height;
-    unsigned int widthStride;
-    unsigned int heightStride;
     unsigned int channelNum;
     unsigned int batchIdx;
     IEPrecisionType precision; //IE_FP32:IE_FP16:IE_U8
