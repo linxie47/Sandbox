@@ -26,6 +26,8 @@ rm -rf \
     libpugixml.*                     \
     libstb_image.a
 
+rm -rf $LIBRAY_PATH/dldt.pc
+
 echo "remove header files ......"
 
 INCLUDE_PATH=/usr/include/dldt

@@ -12,30 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.5)
 
-set (TARGET_NAME "inference_engine_c_wrapper")
+project(InferenceEngine_C_API)
 
-set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${Project_BINARY_DIR}/${CMAKE_BUILD_TYPE}/lib)
+include(GNUInstallDirs)
 
-file (GLOB MAIN_SRC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
-        )
+set(PROJECT_VERSION_MAJOR 1)
+set(PROJECT_VERSION_MINOR 0)
+set(PROJECT_VERSION_PATCH 1)
+set(C_API_VERSION_SO 1)
 
-file (GLOB MAIN_HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
-        )
-
-source_group("src" FILES ${MAIN_SRC})
-source_group("include" FILES ${MAIN_HEADERS})
-
-add_library(${TARGET_NAME} SHARED ${MAIN_SRC} ${MAIN_HEADERS})
-
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
 # Find InferenceEngine
 find_package(InferenceEngine 1.0)
@@ -43,9 +31,56 @@ if (NOT InferenceEngine_FOUND)
     message(FATAL_ERROR "")
 endif()
 
-target_include_directories(${TARGET_NAME} SYSTEM PRIVATE
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
+#inference_engine_c_wrapper
+set(C_API_LIB inference_engine_c_wrapper)
+
+#set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${Project_BINARY_DIR}/${CMAKE_BUILD_TYPE}/lib)
+
+file (GLOB SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ie_c_wrapper/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ie_c_wrapper/*.c
+        )
+
+file (GLOB HEADERS
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
+        )
+
+if (BUILD_SHARED_LIBS)
+    set(C_API_LIBRARY_TYPE SHARED)
+else()
+    set(C_API_LIBRARY_TYPE STATIC)
+endif()
+
+add_library("${C_API_LIB}" "${C_API_LIBRARY_TYPE}" "${HEADERS}" "${SOURCES}")
+if (NOT WIN32)
+    target_link_libraries("${C_API_LIB}" m)
+endif()
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+
+target_include_directories(${C_API_LIB} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
-set_target_properties(${TARGET_NAME} PROPERTIES "CMAKE_CXX_FLAGS" "${CMAKE_CXX_FLAGS} -fPIE" COMPILE_PDB_NAME ${TARGET_NAME})
-target_link_libraries(${TARGET_NAME} IE::ie_cpu_extension ${InferenceEngine_LIBRARIES})
+# tricky way to generate a dldt pkgconfig file to make compatible with open source dldt
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/library_config/dldt.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" @ONLY)
+
+install(FILES "include/ie_api_wrapper.h" DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt")
+install(FILES "include/ie_common_wrapper.h" DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig")
+install(TARGETS "${C_API_LIB}" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
+
+set_target_properties("${C_API_LIB}"
+    PROPERTIES
+    "CMAKE_CXX_FLAGS" "${CMAKE_CXX_FLAGS} -fPIE" COMPILE_PDB_NAME ${C_API_LIB}
+        SOVERSION "${C_API_VERSION_SO}"
+        VERSION "${PROJECT_VERSION}")
+
+target_link_libraries("${C_API_LIB}" IE::ie_cpu_extension ${InferenceEngine_LIBRARIES})
+

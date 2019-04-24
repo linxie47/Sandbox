@@ -1,0 +1,8 @@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: DLDT
+Version: @PROJECT_VERSION@
+Description: Intel Deep Learning Deployment Toolkit C API
+Libs: -L${libdir} -linference_engine_c_wrapper
+Cflags: -I${includedir}
