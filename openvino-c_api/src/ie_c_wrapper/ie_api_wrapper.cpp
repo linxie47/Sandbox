@@ -55,12 +55,6 @@ void IECreateModel(void * contextPtr, IEConfig * config)
     context->createModel(config);
 }
 
-void IEGetModelInputImageSize(void * contextPtr, IEImageSize * imageSize)
-{
-    InferenceEngine::CIEContext * context = reinterpret_cast<InferenceEngine::CIEContext *>(contextPtr);
-    context->getModelInputSize(imageSize);
-}
-
 void IEGetModelInputInfo(void * contextPtr, IEInputOutputInfo * info)
 {
     InferenceEngine::CIEContext * context = reinterpret_cast<InferenceEngine::CIEContext *>(contextPtr);

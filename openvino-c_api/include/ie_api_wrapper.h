@@ -62,13 +62,6 @@ void IECreateModel(void * contextPtr, IEConfig * config);
 int IESizeOfContext(void);
 
 /*
-* the API to get the size of Input Image
-* input: the pointer o inference engine context
-* return:the Image size structure
-*/
-void IEGetModelInputImageSize(void * contextPtr, IEImageSize * imageSize);
-
-/*
 * the API to get the info of model Input
 * input: the pointer o inference engine context
 * return:the input info of the model

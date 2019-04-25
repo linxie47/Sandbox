@@ -249,8 +249,6 @@ protected:
     std::string xmlFile;
     std::string binFile;
 
-    IEImageSize modelInputImageSize;
-
     std::vector<InferenceEngine::CNNLayerPtr> layers;
 
     std::map<std::string, std::string> networkConfig;

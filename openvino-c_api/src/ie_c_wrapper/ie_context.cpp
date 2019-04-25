@@ -27,8 +27,6 @@ CIEContext::CIEContext()
     bModelLoaded = false;
     bModelCreated = false;
     targetDevice = InferenceEngine::TargetDevice::eCPU;
-    modelInputImageSize.imageHeight = 0;
-    modelInputImageSize.imageWidth = 0;
 }
 
 CIEContext::~CIEContext()
@@ -40,8 +38,6 @@ CIEContext::CIEContext(IEConfig * config)
 {
     bModelLoaded = false;
     bModelCreated = false;
-    modelInputImageSize.imageHeight = 0;
-    modelInputImageSize.imageWidth = 0;
     targetDevice = InferenceEngine::TargetDevice::eCPU;
     Init(config);
     bModelLoaded = true;
@@ -186,6 +182,7 @@ size_t CIEContext::getInputSize()
     return inputsInfo.size();
 }
 
+#if 0
 void CIEContext::setInputPresion(unsigned int idx, IEPrecisionType precision)
 {
     unsigned int id = 0;
@@ -266,18 +263,7 @@ void CIEContext::setOutputLayout(unsigned int idx, IELayoutType layout)
     }
 
 }
-
-void CIEContext::getModelInputSize(IEImageSize * imageSize)
-{
-    if (!bModelCreated) {
-        std::cout << "Please create the model firstly!" << endl;
-        return;
-    }
-
-    imageSize->imageHeight = modelInputImageSize.imageHeight;
-    imageSize->imageWidth = modelInputImageSize.imageWidth;
-    return;
-}
+#endif
 
 void CIEContext::getModelInputInfo(IEInputOutputInfo * info)
 {
@@ -286,92 +272,75 @@ void CIEContext::getModelInputInfo(IEInputOutputInfo * info)
         return;
     }
 
-    int id = 0;
+    size_t id = 0;
     for (auto & item : inputsInfo) {
-        info->width[id] = item.second->getDims()[0];
-        info->height[id] = item.second->getDims()[1];
-        info->channels[id] = item.second->getDims()[2];
-        info->precision[id] = getEnumByPrecision(item.second->getPrecision());
-        info->layout[id] = getEnumByLayout(item.second->getLayout());
+        auto dims = item.second->getDims();
+        assert(dims.size() <= IE_MAX_DIMENSIONS);
+        for (int i = 0; i < dims.size(); i++)
+            info->tensorMeta[id].dims[i] = dims[i];
+
+        std::string itemName = item.first;
+        assert(itemName.length() < IE_MAX_NAME_LEN);
+        size_t length = itemName.copy(info->tensorMeta[id].layer_name, itemName.length());
+        info->tensorMeta[id].layer_name[length] = '\0';
+        info->tensorMeta[id].precision = getEnumByPrecision(item.second->getPrecision());
+        info->tensorMeta[id].layout = getEnumByLayout(item.second->getLayout());
         id++;
     }
     info->batch_size = getBatchSize();
-    info->numbers = inputsInfo.size();
+    info->number = inputsInfo.size();
 }
 
 void CIEContext::setModelInputInfo(IEInputOutputInfo * info)
 {
-    int id = 0;
-
     if (!bModelLoaded) {
         std::cout << "Please load the model firstly!" << endl;
         return;
     }
 
-    if (info->numbers != inputsInfo.size()) {
+    if (info->number != inputsInfo.size()) {
         std::cout << "Input size is not matched with model!" << endl;
         return;
     }
 
+    size_t id = 0;
     for (auto & item : inputsInfo) {
-        Precision precision = getPrecisionByEnum(info->precision[id]);
+        Precision precision = getPrecisionByEnum(info->tensorMeta[id].precision);
+        Layout layout = getLayoutByEnum(info->tensorMeta[id].layout);
         item.second->setPrecision(precision);
-        Layout layout = getLayoutByEnum(info->layout[id]);
         item.second->setLayout(layout);
-
-        if (info->dataType[id] == IE_DATA_TYPE_IMG) {
-            modelInputImageSize.imageHeight = inputsInfo[item.first]->getDims()[1];
-            modelInputImageSize.imageWidth = inputsInfo[item.first]->getDims()[0];
-        }
-
         id++;
     }
 }
 
 void CIEContext::getModelOutputInfo(IEInputOutputInfo * info)
 {
-    int id = 0;
-
     if (!bModelLoaded) {
         std::cout << "Please load the model firstly!" << endl;
         return;
     }
 
+    size_t id = 0;
     for (auto & item : outputsInfo) {
-        auto& _output = item.second;
-        const InferenceEngine::SizeVector outputDims = _output->dims;
-        info->width[id]    = outputDims[0];
-        info->height[id]   = outputDims[1];
-        info->channels[id] = outputDims[2];
-        info->precision[id] = getEnumByPrecision(_output->getPrecision());
-        info->layout[id] = getEnumByLayout(_output->getLayout());
+        auto dims = item.second->getDims();
+        assert(dims.size() <= IE_MAX_DIMENSIONS);
+        for (int i = 0; i < dims.size(); i++)
+            info->tensorMeta[id].dims[i] = dims[i];
+
+        std::string itemName = item.first;
+        assert(itemName.length() < IE_MAX_NAME_LEN);
+        size_t length = itemName.copy(info->tensorMeta[id].layer_name, itemName.length());
+        info->tensorMeta[id].layer_name[length] = '\0';
+        info->tensorMeta[id].precision = getEnumByPrecision(item.second->getPrecision());
+        info->tensorMeta[id].layout = getEnumByLayout(item.second->getLayout());
         id++;
     }
-    info->batch_size = 0;
-    info->numbers = outputsInfo.size();
+    info->batch_size = getBatchSize();
+    info->number = outputsInfo.size();
 }
 
 void CIEContext::setModelOutputInfo(IEInputOutputInfo * info)
 {
-    int id = 0;
-
-    if (!bModelLoaded) {
-        std::cout << "Please load the model firstly!" << endl;
-        return;
-    }
-
-    if (info->numbers != outputsInfo.size()) {
-        std::cout << "Output size is not matched with model!" << endl;
-        return;
-    }
-
-    for (auto & item : outputsInfo) {
-        Precision precision = getPrecisionByEnum(info->precision[id]);
-        item.second->setPrecision(precision);
-        Layout layout = getLayoutByEnum(info->layout[id]);
-        item.second->setLayout(layout);
-        id++;
-    }
 }
 
 void CIEContext::addInput(unsigned int idx, IEData * data)
@@ -414,6 +383,18 @@ void CIEContext::addInput(unsigned int idx, IEData * data)
         else
             nonImageToBlob<uint8_t>(data, blob, data->batchIdx);
     }
+
+#if 1 // TODO: remove when license-plate-recognition-barrier model will take one input
+    if (inputsInfo.count("seq_ind")) {
+        // 'seq_ind' input layer is some relic from the training
+        // it should have the leading 0.0f and rest 1.0f
+        Blob::Ptr seqBlob = inferRequest.GetBlob("seq_ind");
+        int maxSequenceSizePerPlate = seqBlob->getTensorDesc().getDims()[0];
+        float *blob_data = seqBlob->buffer().as<float *>();
+        blob_data[0] = 0.0f;
+        std::fill(blob_data + 1, blob_data + maxSequenceSizePerPlate, 1.0f);
+    }
+#endif
 }
 
 void * CIEContext::getOutput(unsigned int idx, unsigned int * size)

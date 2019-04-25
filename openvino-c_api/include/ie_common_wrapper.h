@@ -12,6 +12,8 @@
 #ifndef _IE_COMMON_WRAPPER_H_
 #define _IE_COMMON_WRAPPER_H_
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -136,21 +138,26 @@ typedef struct tagIEImageSize {
     unsigned int imageHeight;
 }IEImageSize;
 
+#define IE_MAX_DIMENSIONS 4
+#define IE_MAX_NAME_LEN   256
+typedef struct IETensorMetaData {
+    char layer_name[IE_MAX_NAME_LEN];
+    size_t dims[IE_MAX_DIMENSIONS];
+    IEPrecisionType precision;
+    IELayoutType layout;
+    IEDataType dataType;
+} IETensorMetaData;
+
 /**
 * @struct model input info
 * @brief model input info
 */
-#define IE_MAX_INPUT_OUTPUT 10
-typedef struct tagIEInputOutputInfo {
-    unsigned int width[IE_MAX_INPUT_OUTPUT];
-    unsigned int height[IE_MAX_INPUT_OUTPUT];
-    unsigned int channels[IE_MAX_INPUT_OUTPUT];
-    IEPrecisionType precision[IE_MAX_INPUT_OUTPUT];
-    IELayoutType layout[IE_MAX_INPUT_OUTPUT];
-    IEDataType dataType[IE_MAX_INPUT_OUTPUT];
-    unsigned int batch_size;
-    unsigned int numbers;
-}IEInputOutputInfo;
+#define IE_MAX_INPUT_OUTPUT 8
+typedef struct IEInputOutputInfo {
+    size_t batch_size;
+    size_t number;
+    IETensorMetaData tensorMeta[IE_MAX_INPUT_OUTPUT];
+} IEInputOutputInfo;
 
 /**
 * @struct inference engine image Input Data(BGR)
