@@ -31,6 +31,8 @@ if (NOT InferenceEngine_FOUND)
     message(FATAL_ERROR "")
 endif()
 
+include_directories(${InferenceEngine_INCLUDE_DIRS})
+
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 #inference_engine_c_wrapper
@@ -63,17 +65,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
-target_include_directories(${C_API_LIB} SYSTEM PRIVATE
+include_directories(${C_API_LIB} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
+
+set (install_headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_api_wrapper.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_common_wrapper.h
+    )
+set (DLDT_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt)
 
 # tricky way to generate a dldt pkgconfig file to make compatible with open source dldt
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/library_config/dldt.pc.in"
     "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" @ONLY)
 
-install(FILES "include/ie_api_wrapper.h" DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt")
-install(FILES "include/ie_common_wrapper.h" DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt")
+install(FILES ${install_headers} DESTINATION ${DLDT_INSTALL_INCLUDEDIR})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ie_cpu_extension/libcpu_extension.so" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 install(TARGETS "${C_API_LIB}" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 
 set_target_properties("${C_API_LIB}"
@@ -83,4 +91,3 @@ set_target_properties("${C_API_LIB}"
         VERSION "${PROJECT_VERSION}")
 
 target_link_libraries("${C_API_LIB}" IE::ie_cpu_extension ${InferenceEngine_LIBRARIES})
-

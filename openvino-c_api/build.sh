@@ -62,25 +62,8 @@ fi
 sh ./clean_up.sh
 
 BUILD_TYPE=Release
-mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. && make -j16
+INSTALL_DIR="/usr/local"
+mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. && make -j16 && sudo make install
 
-for p in /usr; do \
-    mkdir -p $p/include/dldt; \
-    cp -r $InferenceEngine_DIR/../include/* $p/include/dldt; \
-    cp ../include/* $p/include/dldt; \
-    libdir="$p/lib/x86_64-linux-gnu"; \
-    cp -r $IE_PLUGINS_PATH/* "$libdir"; \
-    cp ./$BUILD_TYPE/lib/*.so "$libdir"; \
-    mkdir -p "$libdir/pkgconfig"; \
-    pc="$libdir/pkgconfig/dldt.pc"; \
-    echo "prefix=/usr" > "$pc"; \
-    echo "libdir=/usr/lib/x86_64-linux-gnu" >> "$pc"; \
-    echo "includedir=/usr/include/dldt" >> "$pc"; \
-    echo "" >> "$pc"; \
-    echo "Name: DLDT" >> "$pc"; \
-    echo "Description: Intel Deep Learning Deployment Toolkit" >> "$pc"; \
-    echo "Version: 5.0" >> "$pc"; \
-    echo "" >> "$pc"; \
-    echo "Libs: -L\${libdir} -linference_engine -linference_engine_c_wrapper " >> "$pc"; \
-    echo "Cflags: -I\${includedir}" >> "$pc"; \
-done;
+# copy IE headers and libraries
+cp -r $InferenceEngine_DIR/../include/* "$INSTALL_DIR/include/dldt" && cp -r $IE_PLUGINS_PATH/* "$INSTALL_DIR/lib"
