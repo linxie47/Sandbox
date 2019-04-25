@@ -59,11 +59,17 @@ if ! command -v cmake &>/dev/null; then
     exit 1
 fi
 
-sh ./clean_up.sh
+sudo sh ./clean_up.sh
 
+BASEDIR=$PWD
+TEMP_DIR=/tmp/dldt-c-api
 BUILD_TYPE=Release
 INSTALL_DIR="/usr/local"
-mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. && make -j16 && sudo make install
+mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. && make -j16 && sudo make install && \
+mkdir -p $TEMP_DIR && sudo make DESTDIR=$TEMP_DIR install
 
 # copy IE headers and libraries
-cp -r $InferenceEngine_DIR/../include/* "$INSTALL_DIR/include/dldt" && cp -r $IE_PLUGINS_PATH/* "$INSTALL_DIR/lib"
+sudo cp -r $InferenceEngine_DIR/../include/* "$INSTALL_DIR/include/dldt" && sudo cp -r $IE_PLUGINS_PATH/* "$INSTALL_DIR/lib"
+
+# make package
+tar -C $TEMP_DIR -zvcf $BASEDIR/dldt-c-api.tgz . && rm -rf $TEMP_DIR
