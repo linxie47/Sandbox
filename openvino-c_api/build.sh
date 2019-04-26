@@ -61,6 +61,7 @@ fi
 
 sudo sh ./clean_up.sh
 
+version=$(git log -1 --oneline . | head -c7)
 BASEDIR=$PWD
 TEMP_DIR=/tmp/dldt-c-api
 BUILD_TYPE=Release
@@ -72,4 +73,4 @@ mkdir -p $TEMP_DIR && sudo make DESTDIR=$TEMP_DIR install
 sudo cp -r $InferenceEngine_DIR/../include/* "$INSTALL_DIR/include/dldt" && sudo cp -r $IE_PLUGINS_PATH/* "$INSTALL_DIR/lib"
 
 # make package
-tar -C $TEMP_DIR -zvcf $BASEDIR/dldt-c-api.tgz . && rm -rf $TEMP_DIR
+tar -C $TEMP_DIR -zvcf $BASEDIR/dldt-c-api-${version}.tgz . && sudo rm -rf $TEMP_DIR
