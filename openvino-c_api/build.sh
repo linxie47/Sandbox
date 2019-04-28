@@ -17,7 +17,7 @@
 if [[ -z "${INTEL_CVSDK_DIR}" ]]; then
     printf "\nINTEL_CVSDK_DIR environment variable is not set. Trying to find setupvars.sh to set it. \n"
 
-    setvars_path=/opt/intel/computer_vision_sdk
+    setvars_path=/opt/intel/openvino
     if [ -e "$setvars_path/inference_engine/bin/setvars.sh" ]; then # for Intel Deep Learning Deployment Toolkit package
         setvars_path="$setvars_path/inference_engine/bin/setvars.sh"
     elif [ -e "$setvars_path/bin/setupvars.sh" ]; then # for OpenVINO package
@@ -32,25 +32,7 @@ if [[ -z "${INTEL_CVSDK_DIR}" ]]; then
     fi
 fi
 
-if [[ -f /etc/centos-release ]]; then
-    IE_PLUGINS_PATH=$INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/centos_7.4/intel64
-elif [[ -f /etc/lsb-release ]]; then
-    UBUNTU_VERSION=$(lsb_release -r -s)
-    if [[ $UBUNTU_VERSION = "16.04" ]]; then
-        IE_PLUGINS_PATH=$INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/ubuntu_16.04/intel64
-    elif [[ $UBUNTU_VERSION = "18.04" ]]; then
-        IE_PLUGINS_PATH=$INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/ubuntu_18.04/intel64
-    elif cat /etc/lsb-release | grep -q "Yocto" ; then
-        IE_PLUGINS_PATH=$INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/ubuntu_16.04/intel64
-    fi
-elif [[ -f /etc/os-release ]]; then
-    OS_NAME=$(lsb_release -i -s)
-    OS_VERSION=$(lsb_release -r -s)
-    OS_VERSION=${OS_VERSION%%.*}
-    if [ $OS_NAME = "Raspbian" ] && [ $OS_VERSION = "9" ]; then
-        IE_PLUGINS_PATH=$INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/raspbian_9/armv7l
-    fi
-fi
+IE_PLUGINS_PATH=$INTEL_OPENVINO_DIR/deployment_tools/inference_engine/lib/$system_type
 
 echo "find InferenceEngine_DIR: $InferenceEngine_DIR, IE_PLUGINS_PATH: $IE_PLUGINS_PATH"
 
@@ -61,7 +43,7 @@ fi
 
 sudo sh ./clean_up.sh
 
-version=$(git log -1 --oneline . | head -c7)
+version="$(echo $INTEL_CVSDK_DIR | rev | cut -d'/' -f-1 | rev)_$(git log -1 --oneline . | head -c7)"
 BASEDIR=$PWD
 TEMP_DIR=/tmp/dldt-c-api
 BUILD_TYPE=Release
@@ -70,7 +52,8 @@ mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. && make -j
 mkdir -p $TEMP_DIR && sudo make DESTDIR=$TEMP_DIR install
 
 # copy IE headers and libraries
-sudo cp -r $InferenceEngine_DIR/../include/* "$INSTALL_DIR/include/dldt" && sudo cp -r $IE_PLUGINS_PATH/* "$INSTALL_DIR/lib"
+#sudo cp -r $InferenceEngine_DIR/../include/* "$INSTALL_DIR/include/dldt" && sudo cp -r $IE_PLUGINS_PATH/* "$INSTALL_DIR/lib"
 
 # make package
-tar -C $TEMP_DIR -zvcf $BASEDIR/dldt-c-api-${version}.tgz . && sudo rm -rf $TEMP_DIR
+tar -C $TEMP_DIR -zvcf $BASEDIR/dldt-c-api-${version}.tgz . && sudo rm -rf $TEMP_DIR && \
+echo "dldt-c-api-${version}.tgz created!"
