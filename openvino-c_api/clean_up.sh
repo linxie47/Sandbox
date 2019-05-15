@@ -21,6 +21,9 @@ for LIBRAY_PATH in /usr/lib/x86_64-linux-gnu /usr/local/lib ; do \
     libGNAPlugin_test_static.a     \
     libhelpers.a                   \
     libHeteroPlugin.so             \
+    libhddlapi.so                  \
+    libHDDLPlugin.so               \
+    libmyriadPlugin.so             \
     libinference_engine_c_wrapper.* \
     libinference_engine_s.a          \
     libinference_engine.so           \

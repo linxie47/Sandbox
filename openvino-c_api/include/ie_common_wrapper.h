@@ -1,16 +1,9 @@
- // Licensed under the Apache License, Version 2.0 (the "License");
- // you may not use this file except in compliance with the License.
- // You may obtain a copy of the License at
- //
- //      http://www.apache.org/licenses/LICENSE-2.0
- //
- // Unless required by applicable law or agreed to in writing, software
- // distributed under the License is distributed on an "AS IS" BASIS,
- // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- // See the License for the specific language governing permissions and
- // limitations under the License.
-#ifndef _IE_COMMON_WRAPPER_H_
-#define _IE_COMMON_WRAPPER_H_
+// Copyright (C) 2018-2019 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+//
+
+#ifndef OPENVINO_DLDT_INFERENCE_ENGINE_INCLUDE_IE_COMMON_WRAPPER_H_
+#define OPENVINO_DLDT_INFERENCE_ENGINE_INCLUDE_IE_COMMON_WRAPPER_H_
 
 #include <stddef.h>
 
@@ -57,7 +50,7 @@ typedef enum tagIEPrecisinType {
 * @brief Layouts that the inference engine supports
 */
 typedef enum tagIELayoutType {
-    IE_ANY = 0,// "any" layout
+    IE_ANY = 0,  // "any" layout
     // I/O data layouts
     IE_NCHW = 1,
     IE_NHWC = 2,
@@ -167,12 +160,12 @@ typedef struct tagIEData {
 #define NUM_DATA_POINTS 4
     unsigned char *data[NUM_DATA_POINTS];  // pointers to picture planes
     int        linesize[NUM_DATA_POINTS];  // size in bytes of each picture line
-    unsigned int size;  //byte size
+    unsigned int size;  // byte size
     unsigned int width;
     unsigned int height;
     unsigned int channelNum;
     unsigned int batchIdx;
-    IEPrecisionType precision; //IE_FP32:IE_FP16:IE_U8
+    IEPrecisionType precision;  // IE_FP32:IE_FP16:IE_U8
     IEMemoryType memType;
     IEImageFormatType imageFormat;
     IEDataType dataType;
@@ -190,7 +183,7 @@ typedef struct tagIEConfig {
     char * pluginPath;
     char * cpuExtPath;
     char * cldnnExtPath;
-    char * modelFileName; // Bin file name
+    char * modelFileName;  // Bin file name
     char * outputLayerName;
     unsigned int  perfCounter;
     unsigned int inferReqNum;   // it work with async mode and value is 1 in default.
@@ -199,4 +192,4 @@ typedef struct tagIEConfig {
 #ifdef __cplusplus
 }
 #endif
-#endif
+#endif  // OPENVINO_DLDT_INFERENCE_ENGINE_INCLUDE_IE_COMMON_WRAPPER_H_

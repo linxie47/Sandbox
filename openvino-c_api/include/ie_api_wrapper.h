@@ -1,17 +1,9 @@
- // Licensed under the Apache License, Version 2.0 (the "License");
- // you may not use this file except in compliance with the License.
- // You may obtain a copy of the License at
- //
- //      http://www.apache.org/licenses/LICENSE-2.0
- //
- // Unless required by applicable law or agreed to in writing, software
- // distributed under the License is distributed on an "AS IS" BASIS,
- // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- // See the License for the specific language governing permissions and
- // limitations under the License.
+// Copyright (C) 2018-2019 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+//
 
-#ifndef _IE_PLUGIN_WRAPPER_H_
-#define _IE_PLUGIN_WRAPPER_H_
+#ifndef OPENVINO_DLDT_INFERENCE_ENGINE_INCLUDE_IE_API_WRAPPER_H_
+#define OPENVINO_DLDT_INFERENCE_ENGINE_INCLUDE_IE_API_WRAPPER_H_
 
 #include "ie_common_wrapper.h"
 
@@ -109,7 +101,7 @@ void IESetInput(void * contextPtr, unsigned int idx, IEData * data);
 * input: the pointer o inference engine context
 * input: the output buffer
 */
-//void IESetOutput(void * contextPtr, IEData * data);
+// void IESetOutput(void * contextPtr, IEData * data);
 
 /*
 * the API to get the result pointer after the execution
@@ -136,4 +128,4 @@ void IESetCpuThreadsNum(void *contextPtr, unsigned int num);
 #ifdef __cplusplus
 }
 #endif
-#endif
+#endif  // OPENVINO_DLDT_INFERENCE_ENGINE_INCLUDE_IE_API_WRAPPER_H_
