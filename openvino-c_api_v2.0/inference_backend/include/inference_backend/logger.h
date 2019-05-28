@@ -17,7 +17,7 @@ enum {
     GVA_MEMDUMP_LOG_LEVEL,
 };
 
-#define GVA_DEBUG_LOG(level, message) debug_log(level, __FILE__, __FUNCTION__, __LINE__, message);
+#define GVA_DEBUG_LOG(level, message) // debug_log(level, __FILE__, __FUNCTION__, __LINE__, message);
 
 #define GVA_MEMDUMP(message) GVA_DEBUG_LOG(GVA_MEMDUMP_LOG_LEVEL, message);
 #define GVA_TRACE(message) GVA_DEBUG_LOG(GVA_TRACE_LOG_LEVEL, message);

@@ -3,7 +3,9 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 #include <libavutil/frame.h>
 
@@ -68,6 +70,8 @@ int ff_base_inference_send(FFBaseInference *base_inference, AVFrame *frame_in);
 
 int ff_base_inference_fetch(FFBaseInference *base_inference, ProcessedFrame *out_put);
 
+#ifdef __cplusplus
 }
+#endif
 
 #endif /* __FF_BASE_INFERENCE_H__ */

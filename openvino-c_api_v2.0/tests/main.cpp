@@ -22,9 +22,9 @@ int main(int argc, char const *argv[])
     
     FFBaseInference base = { };
     memset(&base, 0, sizeof(FFBaseInference));
-    base.model = (char *)FLAGS_m.c_str();
-    base.device = (char *)FLAGS_infer_device.c_str();
-    base.inference_id = (char *)"ie_wrapper-test";
+    base.model = (char *)strdup(FLAGS_m.c_str());
+    base.device = (char *)strdup(FLAGS_infer_device.c_str());
+    base.inference_id = (char *)strdup("ie_wrapper-test");
     base.is_full_frame = TRUE;
     base.nireq = 2;
     base.batch_size = 1;
@@ -138,6 +138,7 @@ int main(int argc, char const *argv[])
                 ff_base_inference_fetch(&base, &out_frame);
                 if (out_frame.frame != 0) {
                     processed_frame++;
+                    av_frame_free(&out_frame.frame);
                 }
 
                 av_frame_free(&frame);
@@ -148,6 +149,7 @@ int main(int argc, char const *argv[])
         av_packet_unref(&packet);
     }
 
+    ff_base_inference_release(&base);
     printf("Exiting: processed %d\n", processed_frame);
 
     avcodec_free_context(&decoder_ctx);

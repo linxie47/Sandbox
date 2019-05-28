@@ -57,5 +57,5 @@ set (install_headers
     ${CMAKE_CURRENT_SOURCE_DIR}/ff_base_inference.h
     )
 
-install(FILES ${install_headers} DESTINATION include/ie-wrapper)
+install(FILES ${install_headers} DESTINATION include/ie_wrapper)
 install(TARGETS "${TARGET_NAME}" DESTINATION lib)

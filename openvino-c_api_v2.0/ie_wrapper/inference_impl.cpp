@@ -222,8 +222,6 @@ void InferenceImpl::InferenceCompletionCallback(
 
     std::lock_guard<std::mutex> guard(output_frames_mutex);
 
-    printf("Inference complete callback!\n");
-
     std::vector<InferenceROI> inference_frames;
     ClassificationModel *model = nullptr;
     for (auto &frame : frames) {
@@ -251,7 +249,7 @@ void InferenceImpl::InferenceCompletionCallback(
                                                           gva_base_inference);
     }
     */
-
+#if 0
     for (const auto &blob_desc : blobs)
     {
         InferenceBackend::OutputBlob::Ptr blob = blob_desc.second;
@@ -260,12 +258,6 @@ void InferenceImpl::InferenceCompletionCallback(
         const float *detections = (const float *)blob->GetData();
         auto dims = blob->GetDims();
         auto layout = blob->GetLayout();
-
-        printf("DIMS:\n");
-        for (auto dim = dims.begin(); dim < dims.end(); dim++)
-        {
-            printf("\t%lu\n", *dim);
-        }
 
         int object_size = 0;
         int max_proposal_count = 0;
@@ -283,12 +275,12 @@ void InferenceImpl::InferenceCompletionCallback(
             continue;
         }
     }
-
+#endif
     for (InferenceROI &frame : inference_frames) {
         for (OutputFrame &output : output_frames) {
             if (frame.frame == output.frame || frame.frame == output.writable_frame) {
                 output.inference_count--;
-                printf("output frame ref count %d!\n", output.inference_count);
+                // printf("output frame ref count %d!\n", output.inference_count);
                 break;
             }
         }

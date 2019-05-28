@@ -9,7 +9,6 @@
 #include "inference_impl.h"
 
 #include <libavutil/mem.h>
-#include <libavutil/pixfmt.h>
 
 #define IE_WRAPPER_VERSION_MAJOR 1
 #define IE_WRAPPER_VERSION_MINOR 0
