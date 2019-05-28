@@ -7,7 +7,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#cmakedefine DISABLE_VAAPI
+#define DISABLE_VAAPI
 #cmakedefine HAVE_GAPI
 #cmakedefine DISABLE_METAPUBLISH
 

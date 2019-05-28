@@ -1,0 +1,8 @@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@/ie_wrapper
+
+Name: IE_WRAPPER
+Version: @PROJECT_VERSION@
+Description: Intel Deep Learning Deployment Toolkit Wrapper
+Libs: -L${libdir} -lie_wrapper
+Cflags: -I${includedir}

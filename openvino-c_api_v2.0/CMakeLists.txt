@@ -12,89 +12,62 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 2.8.5)
+cmake_minimum_required(VERSION 3.8)
 
-project(InferenceEngine_C_API)
+project(openvino_ie_wrapper)
 
 include(GNUInstallDirs)
 
 set(PROJECT_VERSION_MAJOR 1)
 set(PROJECT_VERSION_MINOR 0)
 set(PROJECT_VERSION_PATCH 1)
-set(C_API_VERSION_SO 1)
 
 set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
-# Find InferenceEngine
-find_package(InferenceEngine 1.0)
-if (NOT InferenceEngine_FOUND)
-    message(FATAL_ERROR "")
+find_package(PkgConfig REQUIRED)
+include(FindPkgConfig)
+
+# ffmpeg
+pkg_check_modules(AVFORMAT REQUIRED "libavformat")
+include_directories(${AVFORMAT_INCLUDE_DIRS})
+link_directories(${AVFORMAT_LIBRARY_DIRS})
+
+pkg_check_modules(AVCODEC REQUIRED "libavcodec")
+include_directories(${AVCODEC_INCLUDE_DIRS})
+link_directories(${AVCODEC_LIBRARY_DIRS})
+
+pkg_check_modules(AVFILTER REQUIRED "libavfilter")
+include_directories(${AVFILTER_INCLUDE_DIRS})
+link_directories(${AVFILTER_LIBRARY_DIRS})
+
+pkg_check_modules(AVUTIL REQUIRED "libavutil")
+include_directories(${AVUTIL_INCLUDE_DIRS})
+link_directories(${AVUTIL_LIBRARY_DIRS})
+
+pkg_check_modules(SWSCALE REQUIRED "libswscale")
+include_directories(${SWSCALE_INCLUDE_DIRS})
+link_directories(${SWSCALE_LIBRARY_DIRS})
+
+if (NOT CMAKE_BUILD_TYPE)
+    SET(CMAKE_BUILD_TYPE "Release")
 endif()
-
-include_directories(${InferenceEngine_INCLUDE_DIRS})
-
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-
-#inference_engine_c_wrapper
-set(C_API_LIB inference_engine_c_wrapper)
-
-#set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${Project_BINARY_DIR}/${CMAKE_BUILD_TYPE}/lib)
-
-file (GLOB SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ie_c_wrapper/*.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ie_c_wrapper/*.c
-        )
-
-file (GLOB HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
-        )
-
-if (BUILD_SHARED_LIBS)
-    set(C_API_LIBRARY_TYPE SHARED)
-else()
-    set(C_API_LIBRARY_TYPE STATIC)
-endif()
-
-add_library("${C_API_LIB}" "${C_API_LIBRARY_TYPE}" "${HEADERS}" "${SOURCES}")
+#SET(CMAKE_BUILD_TYPE "Debug")
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++11 -fPIC ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
 
-include_directories(${C_API_LIB} SYSTEM PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-)
+if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+    add_definitions(-fvisibility=default)
+endif()
 
-set (install_headers
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_api_wrapper.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_common_wrapper.h
-    )
-set (DLDT_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/library_config/ie_wrapper.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/ie_wrapper.pc" @ONLY)
 
-# tricky way to generate a dldt pkgconfig file to make compatible with open source dldt
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/library_config/dldt.pc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" @ONLY)
-
-install(FILES ${install_headers} DESTINATION ${DLDT_INSTALL_INCLUDEDIR})
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ie_cpu_extension/libcpu_extension.so" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
-install(TARGETS "${C_API_LIB}" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
-
-set_target_properties("${C_API_LIB}"
-    PROPERTIES
-    "CMAKE_CXX_FLAGS" "${CMAKE_CXX_FLAGS} -fPIE" COMPILE_PDB_NAME ${C_API_LIB}
-        SOVERSION "${C_API_VERSION_SO}"
-        VERSION "${PROJECT_VERSION}")
-
-target_link_libraries("${C_API_LIB}"
-    PUBLIC
-        ${InferenceEngine_LIBRARIES}
-    PRIVATE
-        m
-        IE::ie_cpu_extension
-        image_inference_openvino pre_proc opencv_pre_proc logger
-)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ie_wrapper.pc" DESTINATION lib/pkgconfig)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/inference_backend/image_inference/openvino/ie_cpu_extension/libcpu_extension.so" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 
 function (set_compile_flags TARGET)
     target_compile_options(${TARGET} PRIVATE $<$<COMPILE_LANGUAGE:C>:${C_FLAGS}> $<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>)
@@ -105,3 +78,5 @@ configure_file(cmake/config.h.in configs/config.h @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/configs)
 
 add_subdirectory(inference_backend)
+add_subdirectory(ie_wrapper)
+add_subdirectory(tests)
