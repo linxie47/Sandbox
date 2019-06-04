@@ -17,12 +17,8 @@
 extern "C" {
 #include <libavutil/frame.h>
 #include <libavutil/pixfmt.h>
+#include <libavutil/log.h>
 }
-
-typedef struct {
-    AVFrame *frame;
-    FFVideoRegionOfInterestMeta roi;
-} InferenceROI;
 
 class InferenceImpl {
   public:
@@ -33,6 +29,8 @@ class InferenceImpl {
     int FilterFrame(FFBaseInference *ovino, AVFrame *frame);
 
     void FetchFrame(FFBaseInference *ovino, ProcessedFrame *out);
+
+    size_t OutputFrameQueueSize() { return output_frames.size(); }
 
     virtual ~InferenceImpl();
 
@@ -49,7 +47,6 @@ class InferenceImpl {
     void InferenceCompletionCallback(std::map<std::string, InferenceBackend::OutputBlob::Ptr> blobs,
                                      std::vector<std::shared_ptr<InferenceBackend::ImageInference::IFrameBase>> frames);
     ClassificationModel CreateClassificationModel(FFBaseInference *ff_base_inference,
-                                                  // std::shared_ptr<InferenceBackend::Allocator> &allocator,
                                                   const std::string &model_file, const std::string &model_proc_path,
                                                   const std::string &object_class);
 

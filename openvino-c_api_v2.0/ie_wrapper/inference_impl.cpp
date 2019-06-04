@@ -31,6 +31,9 @@ inline int avFormatToFourCC(int format) {
     case AV_PIX_FMT_BGRA:
         GVA_DEBUG("AV_PIX_FMT_BGRA");
         return InferenceBackend::FourCC::FOURCC_BGRA;
+    case AV_PIX_FMT_BGR24:
+        GVA_DEBUG("AV_PIX_FMT_BGR24");
+        return InferenceBackend::FourCC::FOURCC_BGR;
 #if VA_MAJOR_VERSION >= 1
     case AV_PIX_FMT_YUV420P:
         GVA_DEBUG("AV_PIX_FMT_YUV420P");
@@ -38,7 +41,7 @@ inline int avFormatToFourCC(int format) {
 #endif
     }
 
-    printf("Unsupported AV Format: %d.", format);
+    av_log(NULL, AV_LOG_ERROR, "Unsupported AV Format: %d.", format);
     return 0;
 }
 
@@ -79,21 +82,7 @@ inline std::map<std::string, std::string> String2Map(std::string const &s) {
 
     return m;
 }
-#if 0
-inline std::shared_ptr<Allocator> CreateAllocator(const char *const allocator_name) {
-    std::shared_ptr<Allocator> allocator;
-    if (allocator_name != nullptr) {
-        try {
-            allocator = std::make_shared<GstAllocatorWrapper>(allocator_name);
-            GVA_TRACE("GstAllocatorWrapper is created");
-        } catch (const std::exception &e) {
-            GVA_ERROR(e.what());
-            throw;
-        }
-    }
-    return allocator;
-}
-#endif
+
 inline std::map<std::string, std::string> CreateInferConfig(const char *const infer_config_str,
                                                             const char *const cpu_streams_c_str, const int nireq) {
     std::map<std::string, std::string> infer_config = String2Map(infer_config_str);
@@ -142,9 +131,9 @@ InferenceImpl::ClassificationModel InferenceImpl::CreateClassificationModel(FFBa
                                                                             const std::string &model_proc_path,
                                                                             const std::string &object_class) {
 
-    printf("Loading model: device=%s, path=%s\n", ff_base_inference->device, model_file.c_str());
-    printf("Setting batch_size=%zd, nireq=%zd\n", ff_base_inference->batch_size, ff_base_inference->nireq);
-    // set_log_function(GST_logger);
+    av_log(NULL, AV_LOG_INFO, "Loading model: device=%s, path=%s\n", ff_base_inference->device, model_file.c_str());
+    av_log(NULL, AV_LOG_INFO, "Setting batch_size=%zd, nireq=%zd\n", ff_base_inference->batch_size, ff_base_inference->nireq);
+
     std::map<std::string, std::string> infer_config =
         CreateInferConfig(ff_base_inference->infer_config, ff_base_inference->cpu_streams, ff_base_inference->nireq);
 
@@ -175,8 +164,6 @@ InferenceImpl::InferenceImpl(FFBaseInference *ff_base_inference)
     std::map<std::string, std::string> infer_config =
         CreateInferConfig(ff_base_inference->infer_config, ff_base_inference->cpu_streams, ff_base_inference->nireq);
 
-    // allocator = CreateAllocator(ff_base_inference->allocator_name);
-    
     std::vector<std::string> object_classes = SplitString(ff_base_inference->object_class);
     for (size_t i = 0; i < model_files.size(); i++) {
         std::string model_proc = i < model_procs.size() ? model_procs[i] : std::string();
@@ -196,7 +183,7 @@ void InferenceImpl::FetchFrame(FFBaseInference *ovino, ProcessedFrame *out) {
     
     auto frame = processed_frames.front();
     out->frame = frame.frame;
-    out->out_blobs = frame.out_blobs;
+
     processed_frames.pop_front();
 }
 
@@ -208,7 +195,7 @@ void InferenceImpl::PushOutput() {
         }
         ProcessedFrame processed_frame = {};
         processed_frame.frame = front.frame;
-        //TODO: fill blob data
+
         processed_frames.push_back(processed_frame);
         output_frames.pop_front();
     }
@@ -228,59 +215,18 @@ void InferenceImpl::InferenceCompletionCallback(
         auto f = std::dynamic_pointer_cast<InferenceResult>(frame);
         model = f->model;
         inference_frames.push_back(f->inference_frame);
-        // AVFrame *av_frame = inference_frames.back().frame;
-        // check if we have writable version of this buffer (this function called multiple times on same buffer)
-        /*
-        for (OutputFrame &output : output_frames) {
-            if (output.frame == av_frame) {
-                if (output.writable_frame)
-                    buffer = inference_frames.back().buffer = output.writable_buffer;
-                break;
-            }
-        }
-        */
     }
 
-    // TODO: post proc
-    /*
-    if (gva_base_inference->post_proc) {
-        ((PostProcFunction)gva_base_inference->post_proc)(blobs, inference_frames, model->model_proc,
-                                                          model ? model->model_name.c_str() : nullptr,
-                                                          gva_base_inference);
+    if (ff_base_inference->post_proc) {
+        ((PostProcFunction)ff_base_inference->post_proc)(blobs, inference_frames, model->model_proc,
+                                                         model ? model->model_name.c_str() : nullptr,
+                                                         ff_base_inference);
     }
-    */
-#if 0
-    for (const auto &blob_desc : blobs)
-    {
-        InferenceBackend::OutputBlob::Ptr blob = blob_desc.second;
-        const std::string &layer_name = blob_desc.first;
 
-        const float *detections = (const float *)blob->GetData();
-        auto dims = blob->GetDims();
-        auto layout = blob->GetLayout();
-
-        int object_size = 0;
-        int max_proposal_count = 0;
-        switch (layout) {
-        case InferenceBackend::OutputBlob::Layout::NCHW:
-            object_size = dims[3];
-            max_proposal_count = dims[2];
-            break;
-        default:
-            printf("Unsupported output layout, boxes won't be extracted\n");
-            continue;
-        }
-        if (object_size != 7) { // SSD DetectionOutput format
-            printf("Unsupported output dimensions, boxes won't be extracted\n");
-            continue;
-        }
-    }
-#endif
     for (InferenceROI &frame : inference_frames) {
         for (OutputFrame &output : output_frames) {
             if (frame.frame == output.frame || frame.frame == output.writable_frame) {
                 output.inference_count--;
-                // printf("output frame ref count %d!\n", output.inference_count);
                 break;
             }
         }
@@ -376,16 +322,13 @@ int InferenceImpl::FilterFrame(FFBaseInference *ff_base_inference, AVFrame *fram
           (ff_base_inference->every_nth_frame > 0 && frame_num % ff_base_inference->every_nth_frame > 0));
     
     // push into output_frames queue
-    AVFrame *frame_copy;
     {
         std::lock_guard<std::mutex> guard(output_frames_mutex);
         if (!run_inference && output_frames.empty()) {
             return 0;
         }
 
-        frame_copy = av_frame_alloc();
-        av_frame_ref(frame_copy, frame);
-        InferenceImpl::OutputFrame output_frame = {.frame = frame_copy,
+        InferenceImpl::OutputFrame output_frame = {.frame = frame,
                                                    .writable_frame = NULL,
                                                    .inference_count = run_inference ? inference_count : 0 };
         output_frames.push_back(output_frame);
@@ -396,7 +339,7 @@ int InferenceImpl::FilterFrame(FFBaseInference *ff_base_inference, AVFrame *fram
         }
     }
 
-    return SubmitImages(metas, frame_copy);
+    return SubmitImages(metas, frame);
 }
 
 std::string InferenceImpl::CreateNestedErrorMsg(const std::exception &e, int level) {

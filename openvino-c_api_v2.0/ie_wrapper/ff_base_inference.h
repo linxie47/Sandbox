@@ -1,5 +1,10 @@
-#ifndef __FF_BASE_INFERENCE_H__
-#define __FF_BASE_INFERENCE_H__
+/*******************************************************************************
+ * Copyright (C) 2018-2019 Intel Corporation
+ *
+ * SPDX-License-Identifier: MIT
+ ******************************************************************************/
+
+#pragma once
 
 #include <stddef.h>
 
@@ -7,7 +12,7 @@
 extern "C" {
 #endif
 
-#include <libavutil/frame.h>
+#include "ie_wrapper.h"
 
 #ifndef TRUE
 /** The TRUE value of a UBool @stable ICU 2.0 */
@@ -18,7 +23,7 @@ extern "C" {
 #   define FALSE 0
 #endif
 
-typedef struct _FFBaseInference {
+struct _FFBaseInference {
     // properties
     char  *model;
     char  *object_class;
@@ -30,17 +35,15 @@ typedef struct _FFBaseInference {
     char  *inference_id;
     char  *cpu_streams;
     char  *infer_config;
-    char  *allocator_name;
     
     // other fields
-    //GstVideoInfo *info;
     int   is_full_frame;
     void *inference;        // C++ type: InferenceImpl*
-    void *pre_proc;         // C++ type: PostProcFunction
+    void *pre_proc;         // C++ type: PreProcFunction
     void *post_proc;        // C++ type: PostProcFunction
     void *get_roi_pre_proc; // C++ type: GetROIPreProcFunction
     int   initialized;
-} FFBaseInference;
+};
 
 typedef struct _FFVideoRegionOfInterestMeta {
     int roi_type;
@@ -51,27 +54,36 @@ typedef struct _FFVideoRegionOfInterestMeta {
     unsigned int h;
 } FFVideoRegionOfInterestMeta;
 
-typedef struct {
-    AVFrame *frame;
-    void    *out_blobs;
-} ProcessedFrame;
-
-const char* ff_base_inference_version(void);
-
 int ff_base_inference_init(FFBaseInference *base_inference);
-
-int ff_base_inference_set_model(FFBaseInference *base_inference, const char *model_path);
-
-int ff_base_inference_set_model_proc(FFBaseInference *base_inference, const char *model_proc_path);
 
 int ff_base_inference_release(FFBaseInference *base_inference);
 
 int ff_base_inference_send(FFBaseInference *base_inference, AVFrame *frame_in);
 
-int ff_base_inference_fetch(FFBaseInference *base_inference, ProcessedFrame *out_put);
+int ff_base_inference_fetch(FFBaseInference *base_inference, ProcessedFrame *output);
+
+size_t ff_base_inference_ouput_frame_queue_size(FFBaseInference *base_inference);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __FF_BASE_INFERENCE_H__ */
+#ifdef __cplusplus
+
+#include "inference_backend/image_inference.h"
+#include <functional>
+
+typedef struct {
+    AVFrame *frame;
+    FFVideoRegionOfInterestMeta roi;
+} InferenceROI;
+
+// Pre-processing and post-processing function signatures
+typedef void (*PreProcFunction)(void *preproc, InferenceBackend::Image &image);
+typedef std::function<void(InferenceBackend::Image &)> (*GetROIPreProcFunction)(void *preproc,
+                                                                                FFVideoRegionOfInterestMeta *roi_meta);
+typedef void (*PostProcFunction)(const std::map<std::string, InferenceBackend::OutputBlob::Ptr> &output_blobs,
+                                 std::vector<InferenceROI> frames,
+                                 const std::map<std::string, void *> &model_proc, const char *model_name,
+                                 FFBaseInference *ff_base_inference);
+#endif

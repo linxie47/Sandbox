@@ -19,10 +19,13 @@ set(TARGET_NAME "ie_wrapper")
 file (GLOB MAIN_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/proc_factory/*.cpp
         )
 
 file (GLOB MAIN_HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/proc_factory/*.h
         )
         
 add_library(${TARGET_NAME} SHARED ${MAIN_SRC} ${MAIN_HEADERS})
@@ -33,6 +36,9 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -fpermissive -fPIE ${CMAKE_CXX_FLAGS}")
 target_include_directories(${TARGET_NAME}
 PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        ${CMAKE_CURRENT_SOURCE_DIR}/proc_factory/
+        ${CMAKE_CURRENT_SOURCE_DIR}/../inference_backend/include/
 )
 
 target_link_libraries(${TARGET_NAME}
@@ -53,9 +59,9 @@ if(NOT ${DISABLE_VAAPI})
     target_link_libraries(${TARGET_NAME} PRIVATE vaapi_pre_proc)
 endif()
 
-set (install_headers
-    ${CMAKE_CURRENT_SOURCE_DIR}/ff_base_inference.h
-    )
+set (install_headers ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_wrapper.h
+                     ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_meta.h
+                     )
 
 install(FILES ${install_headers} DESTINATION include/ie_wrapper)
 install(TARGETS "${TARGET_NAME}" DESTINATION lib)
