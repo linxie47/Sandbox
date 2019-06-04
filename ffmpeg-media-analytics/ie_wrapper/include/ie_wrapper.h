@@ -7,6 +7,12 @@ extern "C" {
 
 #include <libavutil/frame.h>
 
+typedef enum
+{
+    IE_EVENT_NONE,
+    IE_EVENT_EOS,
+} IE_EVENT;
+
 typedef struct _FFBaseInference FFBaseInference;
 
 typedef struct _FFInferenceParam {
@@ -40,6 +46,8 @@ int IESendFrame(FFBaseInference *base, AVFrame *in);
 int IEGetProcesedFrame(FFBaseInference *base, ProcessedFrame *out);
 
 int IEOutputFrameQueueEmpty(FFBaseInference *base);
+
+void IESendEvent(FFBaseInference *base, int event);
 
 #ifdef __cplusplus
 }

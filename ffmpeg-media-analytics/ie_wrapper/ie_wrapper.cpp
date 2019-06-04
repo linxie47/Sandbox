@@ -69,4 +69,9 @@ int IEOutputFrameQueueEmpty(FFBaseInference *base)
     return ff_base_inference_ouput_frame_queue_size(base) == 0;
 }
 
+void IESendEvent(FFBaseInference *base, int event)
+{
+    return ff_base_inference_sink_event(base, event);
+}
+
 } /* extern "C" */

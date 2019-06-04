@@ -354,6 +354,14 @@ std::string InferenceImpl::CreateNestedErrorMsg(const std::exception &e, int lev
 }
 
 size_t InferenceImpl::OutputFrameQueueSize() {
-    // printf("output:%zu processed:%zu\n", output_frames.size(), processed_frames.size());
+    printf("output:%zu processed:%zu\n", output_frames.size(), processed_frames.size());
     return output_frames.size() + processed_frames.size();
+}
+
+void InferenceImpl::SinkEvent(EVENT event) {
+    if (event == EVENT_EOS) {
+        for (ClassificationModel &model : models) {
+            model.inference->Flush();
+        }
+    }
 }

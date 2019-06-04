@@ -145,4 +145,9 @@ size_t ff_base_inference_ouput_frame_queue_size(FFBaseInference *base_inference)
     return ((InferenceImpl *)base_inference->inference)->OutputFrameQueueSize();
 }
 
+void ff_base_inference_sink_event(FFBaseInference *base_inference, int event)
+{
+    return ((InferenceImpl *)base_inference->inference)->SinkEvent((InferenceImpl::EVENT)event);
+}
+
 }

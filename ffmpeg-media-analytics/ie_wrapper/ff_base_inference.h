@@ -64,6 +64,8 @@ int ff_base_inference_fetch(FFBaseInference *base_inference, ProcessedFrame *out
 
 size_t ff_base_inference_ouput_frame_queue_size(FFBaseInference *base_inference);
 
+void ff_base_inference_sink_event(FFBaseInference *base_inference, int event);
+
 #ifdef __cplusplus
 }
 #endif

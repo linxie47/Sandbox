@@ -22,6 +22,11 @@ extern "C" {
 
 class InferenceImpl {
   public:
+    enum EVENT {
+        EVENT_NONE,
+        EVENT_EOS,
+    };
+
     InferenceImpl(FFBaseInference *base_inference);
 
     // void FlushInference();
@@ -29,6 +34,8 @@ class InferenceImpl {
     int FilterFrame(FFBaseInference *ovino, AVFrame *frame);
 
     void FetchFrame(FFBaseInference *ovino, ProcessedFrame *out);
+
+    void SinkEvent(EVENT event);
 
     size_t OutputFrameQueueSize();
 
