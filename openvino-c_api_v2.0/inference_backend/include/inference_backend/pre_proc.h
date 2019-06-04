@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) <2018-2019> Intel Corporation
+ * Copyright (C) 2018-2019 Intel Corporation
  *
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
@@ -27,5 +27,4 @@ int GetPlanesCount(int fourcc);
 
 PreProc *CreatePreProcGAPI();
 PreProc *CreatePreProcOpenCV();
-PreProc *CreatePreProcVAAPI();
 } // namespace InferenceBackend

@@ -30,7 +30,7 @@ class InferenceImpl {
 
     void FetchFrame(FFBaseInference *ovino, ProcessedFrame *out);
 
-    size_t OutputFrameQueueSize() { return output_frames.size(); }
+    size_t OutputFrameQueueSize();
 
     virtual ~InferenceImpl();
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) <2018-2019> Intel Corporation
+ * Copyright (C) 2018-2019 Intel Corporation
  *
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
@@ -9,7 +9,6 @@
 #include "inference_backend/image_inference.h"
 #include "inference_backend/pre_proc.h"
 
-#include <atomic>
 #include <inference_engine.hpp>
 #include <map>
 #include <string>
@@ -41,15 +40,15 @@ class OpenVINOImageInference : public ImageInference {
     virtual void Close();
 
   protected:
-    typedef struct {
+    struct BatchRequest {
         InferenceEngine::InferRequest::Ptr infer_request;
         std::vector<IFramePtr> buffers;
         std::vector<InferenceBackend::Allocator::AllocContext *> alloc_context;
-    } BatchRequest;
+    };
 
-    void GetNextImageBuffer(BatchRequest &request, Image *image);
+    void GetNextImageBuffer(std::shared_ptr<BatchRequest> request, Image *image);
 
-    void WorkingFunction(BatchRequest request);
+    void WorkingFunction();
 
     bool resize_by_inference;
     Allocator *allocator;
@@ -64,22 +63,15 @@ class OpenVINOImageInference : public ImageInference {
     // Threading
     int batch_size;
     std::thread working_thread;
-    SafeQueue<BatchRequest> freeRequests;
-    SafeQueue<BatchRequest> workingRequests;
+    SafeQueue<std::shared_ptr<BatchRequest>> freeRequests;
+    SafeQueue<std::shared_ptr<BatchRequest>> workingRequests;
 
     // VPP
     std::unique_ptr<PreProc> sw_vpp;
-    std::unique_ptr<PreProc> vaapi_vpp;
-
-    std::mutex mutex_;
-    std::mutex inference_completion_mutex_;
-    std::atomic<unsigned int> requests_processing_;
-    std::condition_variable request_processed_;
     bool already_flushed;
     std::mutex flush_mutex;
-    std::shared_ptr<ImageInference> get_ptr();
 
   private:
-    void SubmitImageSoftwarePreProcess(BatchRequest &request, const Image *pSrc,
-                                       std::function<void(Image &)> preProcessor, std::function<void()> runner);
+    void SubmitImageSoftwarePreProcess(std::shared_ptr<BatchRequest> request, const Image *pSrc,
+                                       std::function<void(Image &)> preProcessor);
 };

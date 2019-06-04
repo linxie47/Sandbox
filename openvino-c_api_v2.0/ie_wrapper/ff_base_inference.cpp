@@ -10,6 +10,7 @@
 #include "proc_factory.h"
 
 #include <libavutil/mem.h>
+#include <libavutil/log.h>
 
 #define DEFAULT_MODEL NULL
 #define DEFAULT_INFERENCE_ID NULL
@@ -66,6 +67,14 @@ static void ff_base_inference_cleanup(FFBaseInference *base_inference) {
     base_inference->initialized = FALSE;
 }
 
+static void ff_log_function(int level, const char *file, const char *function, int line, const char *message) {
+    int log_levels[] = { AV_LOG_QUIET, AV_LOG_ERROR, AV_LOG_WARNING,
+                         AV_LOG_VERBOSE, AV_LOG_INFO, AV_LOG_DEBUG,
+                         AV_LOG_INFO, AV_LOG_TRACE, AV_LOG_PANIC};
+
+    av_log(NULL, log_levels[level], "%s:%i : %s \t %s \n", file, line, function, message);
+}
+
 void ff_base_inference_reset(FFBaseInference *base_inference)
 {
     if (base_inference == NULL)
@@ -94,6 +103,8 @@ void ff_base_inference_reset(FFBaseInference *base_inference)
 
 int ff_base_inference_init(FFBaseInference *base_inference)
 {
+    set_log_function(ff_log_function);
+
     InferenceImpl *infer = new InferenceImpl(base_inference);
 
     if (!infer)

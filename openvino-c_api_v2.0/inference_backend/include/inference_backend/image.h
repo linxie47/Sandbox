@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) <2018-2019> Intel Corporation
+ * Copyright (C) 2018-2019 Intel Corporation
  *
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
@@ -10,12 +10,7 @@
 
 namespace InferenceBackend {
 
-enum class MemoryType {
-    ANY = 0,
-    SYSTEM = 1,
-    OPENCL = 2,
-    VAAPI = 3,
-};
+enum class MemoryType { ANY = 0, SYSTEM = 1, OPENCL = 2 };
 
 enum FourCC {
     FOURCC_NV12 = 0x3231564E,
@@ -43,10 +38,6 @@ struct Image {
     union {
         uint8_t *planes[MAX_PLANES_NUMBER]; // if type==SYSTEM
         void *cl_mem;                       // if type==OPENCL
-        struct {                            // if type==VAAPI
-            void *va_display;
-            unsigned int va_surface;
-        };
     };
     int format; // FourCC
     int width;

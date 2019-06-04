@@ -1,5 +1,5 @@
 # ==============================================================================
-# Copyright (C) <2018-2019> Intel Corporation
+# Copyright (C) 2018-2019 Intel Corporation
 #
 # SPDX-License-Identifier: MIT
 # ==============================================================================
@@ -9,7 +9,6 @@ cmake_minimum_required(VERSION 3.1)
 set (TARGET_NAME "opencv_pre_proc")
 
 find_package(OpenCV COMPONENTS core imgproc imgcodecs)
-#find_package(OpenCV)
 if(OpenCV_FOUND)
     add_definitions(-DHAVE_OPENCV)
 endif()

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) <2018-2019> Intel Corporation
+ * Copyright (C) 2018-2019 Intel Corporation
  *
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
@@ -12,10 +12,6 @@ using namespace InferenceBackend;
 namespace InferenceBackend {
 
 PreProc *PreProc::Create(MemoryType type) {
-#ifndef DISABLE_VAAPI
-    if (type == MemoryType::VAAPI)
-        return CreatePreProcVAAPI();
-#endif
     if (type == MemoryType::SYSTEM) {
 #ifdef HAVE_GAPI
         return CreatePreProcGAPI();

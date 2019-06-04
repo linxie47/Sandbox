@@ -352,3 +352,8 @@ std::string InferenceImpl::CreateNestedErrorMsg(const std::exception &e, int lev
     }
     return msg;
 }
+
+size_t InferenceImpl::OutputFrameQueueSize() {
+    // printf("output:%zu processed:%zu\n", output_frames.size(), processed_frames.size());
+    return output_frames.size() + processed_frames.size();
+}

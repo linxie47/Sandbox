@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) <2018-2019> Intel Corporation
+ * Copyright (C) 2018-2019 Intel Corporation
  *
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
@@ -17,13 +17,13 @@
 
 #include <ext_list.hpp>
 
-#include <chrono>
-
 // For debuging purposes uncomment the following to lines
 // #include <opencv2/opencv.hpp>
 // #include <string>
 
 namespace IE = InferenceEngine;
+
+namespace {
 
 inline std::string fileNameNoExt(const std::string &filepath) {
     auto pos = filepath.rfind('.');
@@ -88,6 +88,8 @@ inline std::vector<std::string> split(const std::string &s, char delimiter) {
     return tokens;
 }
 
+} // namespace
+
 //////////////////////////////////////////////////////////////////////////////////
 
 class IEOutputBlob : public OutputBlob {
@@ -134,8 +136,6 @@ OpenVINOImageInference::OpenVINOImageInference(std::string devices, std::string 
 
     resize_by_inference =
         config.count(KEY_RESIZE_BY_INFERENCE) > 0 ? config.at(KEY_RESIZE_BY_INFERENCE) == "TRUE" : false;
-
-    std::atomic_init(&requests_processing_, static_cast<unsigned int>(0));
 
     auto devices_vec = split(devices, '-');
     std::string cpu_extension = config.count(KEY_CPU_EXTENSION) ? config.at(KEY_CPU_EXTENSION) : "";
@@ -200,8 +200,8 @@ OpenVINOImageInference::OpenVINOImageInference(std::string devices, std::string 
             layers[output.first] = output.second->getTensorDesc();
         }
         for (int i = 0; i < nireq; i++) {
-            BatchRequest req = {};
-            req.infer_request = network.CreateInferRequestPtr();
+            std::shared_ptr<BatchRequest> req = std::make_shared<BatchRequest>();
+            req->infer_request = network.CreateInferRequestPtr();
             if (allocator) {
                 for (auto layer : layers) {
                     size_t nbytes = GetTensorSize(layer.second);
@@ -220,34 +220,38 @@ OpenVINOImageInference::OpenVINOImageInference(std::string devices, std::string 
                         default:
                             throw std::logic_error("Unsupported precision of the layer");
                         }
-                        req.infer_request->SetBlob(layer.first, blob);
-                        req.alloc_context.push_back(alloc_context);
+                        req->infer_request->SetBlob(layer.first, blob);
+                        req->alloc_context.push_back(alloc_context);
                     }
                 }
             }
             freeRequests.push(req);
         }
     }
+
     this->callback = callback;
+    working_thread = std::thread(&OpenVINOImageInference::WorkingFunction, this);
 }
 
 bool OpenVINOImageInference::IsQueueFull() {
     return freeRequests.empty();
 }
 
-void OpenVINOImageInference::GetNextImageBuffer(BatchRequest &request, Image *image) {
+void OpenVINOImageInference::GetNextImageBuffer(std::shared_ptr<BatchRequest> request, Image *image) {
     GVA_DEBUG(__FUNCTION__);
     ITT_TASK(__FUNCTION__);
 
+    if (inputs.begin() == inputs.end())
+        throw std::runtime_error("Inputs data map is empty.");
     std::string inputName = inputs.begin()->first; // assuming one input layer
-    auto blob = request.infer_request->GetBlob(inputName);
+    auto blob = request->infer_request->GetBlob(inputName);
     auto blobSize = blob.get()->dims();
 
     *image = {};
     image->width = blobSize[0];
     image->height = blobSize[1];
     image->format = FOURCC_RGBP;
-    int batchIndex = request.buffers.size();
+    int batchIndex = request->buffers.size();
     int plane_size = image->width * image->height;
     image->planes[0] = blob->buffer().as<uint8_t *>() + batchIndex * plane_size * blobSize[2];
     image->planes[1] = image->planes[0] + plane_size;
@@ -318,13 +322,15 @@ __inline Image ApplyCrop(const Image &src) {
     return dst;
 }
 
-void OpenVINOImageInference::SubmitImageSoftwarePreProcess(BatchRequest &request, const Image *pSrc,
-                                                           std::function<void(Image &)> preProcessor,
-                                                           std::function<void()> runner) {
+void OpenVINOImageInference::SubmitImageSoftwarePreProcess(std::shared_ptr<BatchRequest> request, const Image *pSrc,
+                                                           std::function<void(Image &)> preProcessor) {
     if (resize_by_inference) {
         auto frameBlob = wrapMat2Blob(*pSrc);
+
+        if (inputs.begin() == inputs.end())
+            throw std::runtime_error("Inputs data map is empty.");
         std::string inputName = inputs.begin()->first; // assuming one input layer
-        request.infer_request->SetBlob(inputName, frameBlob);
+        request->infer_request->SetBlob(inputName, frameBlob);
     } else {
         Image dst = {};
         GetNextImageBuffer(request, &dst);
@@ -350,7 +356,6 @@ void OpenVINOImageInference::SubmitImageSoftwarePreProcess(BatchRequest &request
             // preProcessor(dst);
             // cv::imwrite(std::string("") + std::to_string(counter++) + "_post" + ".png", mat);
             preProcessor(dst);
-            runner();
         }
     }
 }
@@ -362,36 +367,30 @@ void OpenVINOImageInference::SubmitImage(const Image &image, IFramePtr user_data
     const Image *pSrc = &image;
 
     // front() call blocks if freeRequests is empty, i.e all requests still in workingRequests list and not completed
-    ++requests_processing_;
     auto request = freeRequests.pop();
 
-    auto preProcActor = [this, request, user_data]() mutable {
-        request.buffers.push_back(user_data);
-        // start inference asynchronously if enough buffers for batching
-        if (request.buffers.size() >= (size_t)batch_size) {
+    SubmitImageSoftwarePreProcess(request, pSrc, preProcessor);
+
+    request->buffers.push_back(user_data);
+
+    // start inference asynchronously if enough buffers for batching
+    if (request->buffers.size() >= (size_t)batch_size) {
 #if 1 // TODO: remove when license-plate-recognition-barrier model will take one input
-            if (inputs.count("seq_ind")) {
-                // 'seq_ind' input layer is some relic from the training
-                // it should have the leading 0.0f and rest 1.0f
-                IE::Blob::Ptr seqBlob = request.infer_request->GetBlob("seq_ind");
-                int maxSequenceSizePerPlate = seqBlob->getTensorDesc().getDims()[0];
-                float *blob_data = seqBlob->buffer().as<float *>();
-                blob_data[0] = 0.0f;
-                std::fill(blob_data + 1, blob_data + maxSequenceSizePerPlate, 1.0f);
-            }
-#endif
-            request.infer_request->SetCompletionCallback([this, request]() {
-                std::lock_guard<std::mutex> lock(this->inference_completion_mutex_);
-                this->WorkingFunction(request);
-                this->requests_processing_ -= batch_size;
-                this->request_processed_.notify_all();
-            });
-            request.infer_request->StartAsync();
-        } else {
-            freeRequests.push_front(request);
+        if (inputs.count("seq_ind")) {
+            // 'seq_ind' input layer is some relic from the training
+            // it should have the leading 0.0f and rest 1.0f
+            IE::Blob::Ptr seqBlob = request->infer_request->GetBlob("seq_ind");
+            int maxSequenceSizePerPlate = seqBlob->getTensorDesc().getDims()[0];
+            float *blob_data = seqBlob->buffer().as<float *>();
+            blob_data[0] = 0.0f;
+            std::fill(blob_data + 1, blob_data + maxSequenceSizePerPlate, 1.0f);
         }
-    };
-    SubmitImageSoftwarePreProcess(request, pSrc, preProcessor, preProcActor);
+#endif
+        request->infer_request->StartAsync();
+        workingRequests.push(request);
+    } else {
+        freeRequests.push_front(request);
+    }
 }
 
 const std::string &OpenVINOImageInference::GetModelName() const {
@@ -399,39 +398,82 @@ const std::string &OpenVINOImageInference::GetModelName() const {
 }
 
 void OpenVINOImageInference::Flush() {
-    std::unique_lock<std::mutex> lk(mutex_);
-    while (requests_processing_ != 0) {
-        request_processed_.wait_for(lk, std::chrono::seconds(1), [this] { return requests_processing_ == 0; });
-        break;
+    std::lock_guard<std::mutex> lock(flush_mutex);
+    if (already_flushed) {
+        return;
     }
+
+    if (!working_thread.joinable())
+        return;
+
+    already_flushed = true;
+    auto request = freeRequests.pop();
+    if (!request->buffers.empty()) {
+        request->infer_request->StartAsync();
+        workingRequests.push(request);
+    }
+    workingRequests.waitEmpty();
 }
 
 void OpenVINOImageInference::Close() {
     Flush();
+    if (working_thread.joinable()) {
+        // add empty request
+        std::shared_ptr<BatchRequest> req = std::make_shared<BatchRequest>();
+        workingRequests.push(req);
+        // wait for thread reaching empty request
+        working_thread.join();
+    }
     if (allocator) {
         while (!freeRequests.empty()) {
             auto req = freeRequests.pop();
-            for (auto ac : req.alloc_context)
+            for (auto ac : req->alloc_context)
                 allocator->Free(ac);
         }
     }
 }
 
-void OpenVINOImageInference::WorkingFunction(BatchRequest request) {
+void OpenVINOImageInference::WorkingFunction() {
     GVA_DEBUG(__FUNCTION__);
-    std::map<std::string, OutputBlob::Ptr> output_blobs;
-    for (auto output : outputs) {
-        const std::string &name = output.first;
-        output_blobs[name] = std::make_shared<IEOutputBlob>(request.infer_request->GetBlob(name));
+    for (;;) {
+        ITT_TASK(__FUNCTION__);
+        auto request = workingRequests.front();
+        if (request->buffers.empty()) {
+            break;
+        }
+        IE::StatusCode sts;
+        {
+            ITT_TASK("Wait Inference");
+            sts = request->infer_request->Wait(IE::IInferRequest::WaitMode::RESULT_READY);
+        }
+        if (IE::OK == sts) {
+            try {
+                std::map<std::string, OutputBlob::Ptr> output_blobs;
+                for (auto output : outputs) {
+                    const std::string &name = output.first;
+                    output_blobs[name] = std::make_shared<IEOutputBlob>(request->infer_request->GetBlob(name));
+                }
+                callback(output_blobs, request->buffers);
+            } catch (const std::exception &exc) {
+#ifdef DEBUG
+                printf("Exception in inference callback: %s", exc.what());
+#endif
+            }
+        } else {
+#ifdef DEBUG
+            printf("Inference Error: %d", sts);
+#endif
+        }
+
+        // move request from workingRequests to freeRequests list
+        request = workingRequests.pop();
+        request->buffers.clear();
+        freeRequests.push(request);
     }
-    callback(output_blobs, request.buffers);
-    request.buffers.clear();
-    freeRequests.push(request);
 }
 
 ImageInference::Ptr ImageInference::make_shared(MemoryType, std::string devices, std::string model, int batch_size,
                                                 int nireq, const std::map<std::string, std::string> &config,
                                                 Allocator *allocator, CallbackFunc callback) {
-    return std::shared_ptr<OpenVINOImageInference>(
-        new OpenVINOImageInference(devices, model, batch_size, nireq, config, allocator, callback));
+    return std::make_shared<OpenVINOImageInference>(devices, model, batch_size, nireq, config, allocator, callback);
 }

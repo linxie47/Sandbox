@@ -1,5 +1,5 @@
 # ==============================================================================
-# Copyright (C) <2018-2019> Intel Corporation
+# Copyright (C) 2018-2019 Intel Corporation
 #
 # SPDX-License-Identifier: MIT
 # ==============================================================================
@@ -10,9 +10,6 @@ add_subdirectory(opencv_utils)
 add_subdirectory(opencv)
 if(${HAVE_GAPI})
     add_subdirectory(gapi)
-endif()
-if(NOT ${DISABLE_VAAPI})
-    add_subdirectory(vaapi)
 endif()
 
 set (TARGET_NAME "pre_proc")
