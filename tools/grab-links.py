@@ -4,7 +4,7 @@ from urllib.request import urlopen#用于获取网页
 from bs4 import BeautifulSoup#用于解析网页
 
 if len(sys.argv) != 2 :
-    print("Usage: sys.argv[0] <url>")
+    print("Usage: " +  sys.argv[0] + " <url>")
     sys.exit(1)
 
 print("Grab all links from: " + sys.argv[1])
