@@ -26,7 +26,7 @@ static void infer_detect_metadata_buffer_free(void *opaque, uint8_t *data)
 
 void ExtractBoundingBoxes(const std::map<std::string, InferenceBackend::OutputBlob::Ptr> &output_blobs,
                           std::vector<InferenceROI> frames, const std::map<std::string, void *> &model_proc,
-                          const char *model_name, FFBaseInference *gva_base_inference)
+                          const char *model_name, FFBaseInference *ff_base_inference)
 {
     for (const auto &blob_desc : output_blobs)
     {
@@ -34,7 +34,7 @@ void ExtractBoundingBoxes(const std::map<std::string, InferenceBackend::OutputBl
         if (blob == nullptr)
             throw std::runtime_error("Blob is empty. Cannot access to null object.");
 
-        // const std::string &layer_name = blob_desc.first;
+        const std::string &layer_name = blob_desc.first;
 
         const float *detections = (const float *)blob->GetData();
         auto dims = blob->GetDims();
@@ -73,12 +73,19 @@ void ExtractBoundingBoxes(const std::map<std::string, InferenceBackend::OutputBl
             gst_structure_get_double(post_proc->second, "roi_scale", &roi_scale);
         }
 #endif
-        float threshold = 0.5; //((GstGvaDetect *)gva_base_inference)->threshold;
+        AVBufferRef *labels = nullptr;
+        if (ff_base_inference->model_postproc)
+        {
+            int idx = findModelPostProcByName(ff_base_inference->model_postproc, layer_name.c_str());
+            if (idx != MAX_MODEL_OUTPUT)
+                labels = ff_base_inference->model_postproc->procs[idx].labels;
+        }
 
         BBoxesArray **boxes = (BBoxesArray **)av_mallocz_array(frames.size(), sizeof(boxes[0]));
         if (boxes == nullptr)
             throw std::runtime_error("Cannot alloc space for bounding boxes.");
 
+        float threshold = ff_base_inference->threshold;
         for (int i = 0; i < max_proposal_count; i++)
         {
             int image_id = (int)detections[i * object_size + 0];
@@ -101,28 +108,18 @@ void ExtractBoundingBoxes(const std::map<std::string, InferenceBackend::OutputBl
                     throw std::runtime_error("Cannot alloc space for bounding boxes.");
             }
 
-#if 0
-            const char *label = NULL;
-            if (labels && label_id >= 0 && label_id < (int)labels->n_values) {
-                label = g_value_get_string(labels->values + label_id);
-            }
-#endif
             /* using integer to represent
-            int width = frames[image_id].roi.w;
-            int height = frames[image_id].roi.h;
-            int ix_min = (int)(x_min * width + 0.5);
-            int iy_min = (int)(y_min * height + 0.5);
-            int ix_max = (int)(x_max * width + 0.5);
-            int iy_max = (int)(y_max * height + 0.5);
-            if (ix_min < 0)
-                ix_min = 0;
-            if (iy_min < 0)
-                iy_min = 0;
-            if (ix_max > width)
-                ix_max = width;
-            if (iy_max > height)
-                iy_max = height;
-            */
+             * int width = frames[image_id].roi.w;
+             * int height = frames[image_id].roi.h;
+             * int ix_min = (int)(x_min * width + 0.5);
+             * int iy_min = (int)(y_min * height + 0.5);
+             * int ix_max = (int)(x_max * width + 0.5);
+             * int iy_max = (int)(y_max * height + 0.5);
+             * if (ix_min < 0) ix_min = 0;
+             * if (iy_min < 0) iy_min = 0;
+             * if (ix_max > width) ix_max = width;
+             * if (iy_max > height) iy_max = height; */
+
             InferDetection *new_bbox = (InferDetection *)av_mallocz(sizeof(*new_bbox));
             if (new_bbox == nullptr)
             {
@@ -137,7 +134,8 @@ void ExtractBoundingBoxes(const std::map<std::string, InferenceBackend::OutputBl
             new_bbox->confidence = confidence;
             new_bbox->label_buf = nullptr; // TODO
             new_bbox->label_id = label_id;
-
+            if (labels != nullptr)
+                new_bbox->label_buf = av_buffer_ref(labels);
             av_dynarray_add(&boxes[image_id]->bbox, &boxes[image_id]->num, new_bbox);
         }
 

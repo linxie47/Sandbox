@@ -39,6 +39,9 @@ FFBaseInference *IECreateInference(FFInferenceParam *param)
     base->batch_size = param->batch_size;
     base->every_nth_frame = param->every_nth_frame;
     base->is_full_frame = param->is_full_frame;
+    base->model_preproc = param->model_preproc;
+    base->model_postproc = param->model_postproc;
+    base->threshold = param->threshold;
 #undef INIT_BASE_STR
 
     ff_base_inference_init(base);

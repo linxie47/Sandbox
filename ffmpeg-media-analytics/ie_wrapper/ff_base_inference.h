@@ -35,6 +35,9 @@ struct _FFBaseInference {
     char  *inference_id;
     char  *cpu_streams;
     char  *infer_config;
+    float  threshold;
+    ModelInputPreproc   *model_preproc;
+    ModelOutputPostproc *model_postproc;
     
     // other fields
     int   is_full_frame;

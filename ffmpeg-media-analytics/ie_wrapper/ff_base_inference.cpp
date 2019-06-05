@@ -92,6 +92,9 @@ void ff_base_inference_reset(FFBaseInference *base_inference)
     base_inference->inference_id = av_strdup(DEFAULT_INFERENCE_ID);
     base_inference->cpu_streams = av_strdup(DEFAULT_CPU_STREAMS);
     base_inference->infer_config = av_strdup("");
+    base_inference->threshold = 0.5f;
+    base_inference->model_preproc = NULL;
+    base_inference->model_postproc = NULL;
 
     base_inference->initialized = FALSE;
     base_inference->is_full_frame = TRUE;
