@@ -1,0 +1,383 @@
+From 888bf9ae2fa1b57dddd9903bea6635e1d9615a45 Mon Sep 17 00:00:00 2001
+From: Lin Xie <lin.xie@intel.com>
+Date: Wed, 5 Jun 2019 14:41:00 +0800
+Subject: [PATCH] New detect filter based on ie wrapper
+
+Change-Id: Ia822db01ea6314b1fb7eb23581b1da436a5d87fb
+---
+ configure                  |   6 ++
+ libavfilter/Makefile       |   1 +
+ libavfilter/allfilters.c   |   1 +
+ libavfilter/inference.h    |  27 +----
+ libavfilter/vf_ie_detect.c | 251 +++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 261 insertions(+), 25 deletions(-)
+ create mode 100644 libavfilter/vf_ie_detect.c
+
+diff --git a/configure b/configure
+index dcaaf95..6c0252b 100755
+--- a/configure
++++ b/configure
+@@ -240,6 +240,7 @@ External library support:
+   --enable-libilbc         enable iLBC de/encoding via libilbc [no]
+   --enable-libinference_engine enable intel inference engine as a DNN module
+                                backend [no]
++  --enable-libie_wrapper   enable openvino ie wrapper [no]
+   --enable-libjack         enable JACK audio sound server [no]
+   --enable-libklvanc       enable Kernel Labs VANC processing [no]
+   --enable-libkvazaar      enable HEVC encoding via libkvazaar [no]
+@@ -1727,6 +1728,7 @@ EXTERNAL_LIBRARY_LIST="
+     libiec61883
+     libilbc
+     libinference_engine
++    libie_wrapper
+     libjack
+     libklvanc
+     libkvazaar
+@@ -3419,6 +3421,7 @@ inference_detect_filter_select="dnn"
+ inference_identify_filter_deps="libinference_engine libcjson"
+ inference_identify_filter_select="dnn"
+ inference_metaconvert_filter_deps="libinference_engine libcjson"
++ie_detect_filter_deps="libie_wrapper"
+ interlace_filter_deps="gpl"
+ kerndeint_filter_deps="gpl"
+ ladspa_filter_deps="ladspa libdl"
+@@ -6261,6 +6264,9 @@ enabled librdkafka  && require_pkg_config librdkafka rdkafka "librdkafka/rdkafka
+ 
+ enabled libcjson && check_pkg_config libcjson "libcjson >= 1.7.10" cjson/cJSON.h cJSON_Version || disable libcjson
+ 
++enabled libie_wrapper &&
++    require_pkg_config libie_wrapper ie_wrapper "ie_wrapper.h" IEGetVersion
++
+ if enabled gcrypt; then
+     GCRYPT_CONFIG="${cross_prefix}libgcrypt-config"
+     if "${GCRYPT_CONFIG}" --version > /dev/null 2>&1; then
+diff --git a/libavfilter/Makefile b/libavfilter/Makefile
+index 11f0fb4..d5de73f 100644
+--- a/libavfilter/Makefile
++++ b/libavfilter/Makefile
+@@ -262,6 +262,7 @@ OBJS-$(CONFIG_INFERENCE_CLASSIFY_FILTER)     += vf_inference_classify.o
+ OBJS-$(CONFIG_INFERENCE_DETECT_FILTER)       += vf_inference_detect.o
+ OBJS-$(CONFIG_INFERENCE_IDENTIFY_FILTER)     += vf_inference_identify.o
+ OBJS-$(CONFIG_INFERENCE_METACONVERT_FILTER)  += vf_inference_metaconvert.o
++OBJS-$(CONFIG_IE_DETECT_FILTER)              += vf_ie_detect.o
+ OBJS-$(CONFIG_INFLATE_FILTER)                += vf_neighbor.o
+ OBJS-$(CONFIG_INTERLACE_FILTER)              += vf_tinterlace.o
+ OBJS-$(CONFIG_INTERLEAVE_FILTER)             += f_interleave.o
+diff --git a/libavfilter/allfilters.c b/libavfilter/allfilters.c
+index 4588c2b..10661e9 100644
+--- a/libavfilter/allfilters.c
++++ b/libavfilter/allfilters.c
+@@ -248,6 +248,7 @@ extern AVFilter ff_vf_inference_classify;
+ extern AVFilter ff_vf_inference_detect;
+ extern AVFilter ff_vf_inference_identify;
+ extern AVFilter ff_vf_inference_metaconvert;
++extern AVFilter ff_vf_ie_detect;
+ extern AVFilter ff_vf_inflate;
+ extern AVFilter ff_vf_interlace;
+ extern AVFilter ff_vf_interleave;
+diff --git a/libavfilter/inference.h b/libavfilter/inference.h
+index 1d7971e..9e31fe0 100644
+--- a/libavfilter/inference.h
++++ b/libavfilter/inference.h
+@@ -32,10 +32,9 @@
+ 
+ #include "dnn_interface.h"
+ 
++#include <ie_wrapper.h>
++
+ typedef struct _InferenceBaseContext InferenceBaseContext;
+-typedef struct _InputPreproc         ModelInputPreproc;
+-typedef struct _OutputPostproc       OutputPostproc;
+-typedef struct _ModelOutputPostproc  ModelOutputPostproc;
+ 
+ typedef int (*InferencePreProcess)(InferenceBaseContext *base, int index, AVFrame *in, AVFrame **out);
+ 
+@@ -128,28 +127,6 @@ typedef struct VideoPP {
+ #endif
+ } VideoPP;
+ 
+-struct _InputPreproc {
+-    int   color_format;     ///<! input data format
+-    char *layer_name;       ///<! layer name of input
+-    char *object_class;     ///<! interested object class
+-};
+-
+-struct _OutputPostproc {
+-    char  *layer_name;
+-    char  *converter;
+-    char  *attribute_name;
+-    char  *method;
+-    double threshold;
+-    double tensor2text_scale;
+-    int    tensor2text_precision;
+-    AVBufferRef *labels;
+-};
+-
+-#define MAX_MODEL_OUTPUT 4
+-struct _ModelOutputPostproc {
+-    OutputPostproc procs[MAX_MODEL_OUTPUT];
+-};
+-
+ #define MAX_TENSOR_DIM_NUM 4
+ typedef struct InferTensorMeta {
+     size_t  dim_size;
+diff --git a/libavfilter/vf_ie_detect.c b/libavfilter/vf_ie_detect.c
+new file mode 100644
+index 0000000..41dfac3
+--- /dev/null
++++ b/libavfilter/vf_ie_detect.c
+@@ -0,0 +1,251 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++/**
++ * @file
++ * dnn inference detection filter
++ */
++
++#include "libavutil/opt.h"
++#include "libavutil/mem.h"
++#include "libavutil/eval.h"
++#include "libavutil/avassert.h"
++#include "libavutil/pixdesc.h"
++#include "libavutil/mathematics.h"
++
++#include "formats.h"
++#include "internal.h"
++#include "avfilter.h"
++#include "filters.h"
++#include "libavcodec/avcodec.h"
++#include "libavformat/avformat.h"
++#include "libswscale/swscale.h"
++#include "libavutil/time.h"
++
++#include "inference.h"
++#include <ie_wrapper.h>
++
++
++#define OFFSET(x) offsetof(IeDetectContext, x)
++#define FLAGS (AV_OPT_FLAG_VIDEO_PARAM | AV_OPT_FLAG_FILTERING_PARAM)
++
++typedef struct IeDetectContext {
++    const AVClass *class;
++
++    FFBaseInference *base;
++
++    char  *model_file;
++    char  *device;
++    char  *model_proc;
++    int    backend_type;
++    int    device_type;
++
++    int    req_num;
++    int    batch_size;
++    int    frame_number;
++    int    every_nth_frame;
++    float  threshold;
++
++    int    input_layout;
++    int    input_precision;
++    int    input_is_image;
++
++    void  *proc_config;
++    ModelInputPreproc   model_preproc;
++    ModelOutputPostproc model_postproc;
++} IeDetectContext;
++
++static int query_formats(AVFilterContext *context)
++{
++    AVFilterFormats *formats_list;
++    const enum AVPixelFormat pixel_formats[] = {
++        AV_PIX_FMT_BGR0,     AV_PIX_FMT_RGBP,
++        AV_PIX_FMT_BGRA,     AV_PIX_FMT_VAAPI,
++        AV_PIX_FMT_NONE};
++
++    formats_list = ff_make_format_list(pixel_formats);
++    if (!formats_list) {
++        av_log(context, AV_LOG_ERROR, "Could not create formats list\n");
++        return AVERROR(ENOMEM);
++    }
++
++    return ff_set_common_formats(context, formats_list);
++}
++
++static av_cold int detect_init(AVFilterContext *ctx)
++{
++    IeDetectContext *s = ctx->priv;
++    FFInferenceParam param = { };
++
++    av_assert0(s->model_file);
++
++    param.model        = s->model_file;
++    param.device       = s->device;
++    param.inference_id = (char *)ctx->filter->name;
++
++    param.is_full_frame   = 1;
++    param.nireq           = s->req_num;
++    param.batch_size      = s->batch_size;
++    param.every_nth_frame = s->every_nth_frame;
++    param.threshold       = s->threshold;
++
++    // Parse model process configuration
++    if (s->model_proc) {
++        void *proc = ff_read_model_proc(s->model_proc);
++        if (!proc) {
++            av_log(ctx, AV_LOG_ERROR, "Could not read proc config file:"
++                    "%s\n", s->model_proc);
++            return AVERROR(EIO);
++        }
++
++        if (ff_parse_input_preproc(proc, &s->model_preproc) < 0) {
++            av_log(ctx, AV_LOG_ERROR, "Parse input preproc error.\n");
++            return AVERROR(EIO);
++        }
++
++        if (ff_parse_output_postproc(proc, &s->model_postproc) < 0) {
++            av_log(ctx, AV_LOG_ERROR, "Parse output postproc error.\n");
++            return AVERROR(EIO);
++        }
++
++        s->proc_config = proc;
++        param.model_preproc  = &s->model_preproc;
++        param.model_postproc = &s->model_postproc;
++    }
++
++    av_log(NULL, AV_LOG_INFO, "ie wrapper version:%s\n", IEGetVersion());
++
++    s->base = IECreateInference(&param);
++    if (!s->base) {
++        av_log(ctx, AV_LOG_ERROR, "Could not create inference.\n");
++        return AVERROR(EINVAL);
++    }
++
++    return 0;
++}
++
++static av_cold void detect_uninit(AVFilterContext *ctx)
++{
++    IeDetectContext *s = ctx->priv;
++
++    IEReleaseInference(s->base);
++
++    ff_release_model_proc(s->proc_config, &s->model_preproc, &s->model_postproc);
++}
++
++static int flush_frame(AVFilterLink *outlink, int64_t pts, int64_t *out_pts)
++{
++    AVFilterContext *ctx = outlink->src;
++    IeDetectContext *s = ctx->priv;
++    int ret = 0;
++
++    while (!IEOutputFrameQueueEmpty(s->base)) {
++        ProcessedFrame output = { };
++        IEGetProcesedFrame(s->base, &output);
++        if (output.frame) {
++            ret = ff_filter_frame(outlink, output.frame);
++            *out_pts = output.frame->pts + pts;
++        }
++        IESendEvent(s->base, IE_EVENT_EOS);
++        av_usleep(5000);
++    }
++
++    return ret;
++}
++
++static int activate(AVFilterContext *ctx)
++{
++    AVFilterLink *inlink = ctx->inputs[0];
++    AVFilterLink *outlink = ctx->outputs[0];
++    IeDetectContext *s = ctx->priv;
++    ProcessedFrame output = { };
++    AVFrame *in;
++    int64_t pts;
++    int ret, status;
++
++    FF_FILTER_FORWARD_STATUS_BACK(outlink, inlink);
++
++    ret = ff_inlink_consume_frame(inlink, &in);
++    if (ret < 0)
++        return ret;
++    if (ret > 0)
++        IESendFrame(s->base, in);
++
++    IEGetProcesedFrame(s->base, &output);
++    if (output.frame)
++        return ff_filter_frame(outlink, output.frame);
++
++    if (ff_inlink_acknowledge_status(inlink, &status, &pts)) {
++        if (status == AVERROR_EOF) {
++            int64_t out_pts = pts;
++
++            ret = flush_frame(outlink, pts, &out_pts);
++            ff_outlink_set_status(outlink, status, out_pts);
++            return ret;
++        }
++    }
++
++    FF_FILTER_FORWARD_WANTED(outlink, inlink);
++
++    return FFERROR_NOT_READY;
++}
++
++static const AVOption ie_detect_options[] = {
++    { "dnn_backend", "DNN backend for model execution", OFFSET(backend_type),    AV_OPT_TYPE_FLAGS,  { .i64 = 1},          0, 2,  FLAGS, "engine" },
++    { "model",       "path to model file for network",  OFFSET(model_file),      AV_OPT_TYPE_STRING, { .str = NULL},       0, 0,  FLAGS },
++    { "model_proc",  "model preproc and postproc",      OFFSET(model_proc),      AV_OPT_TYPE_STRING, { .str = NULL},       0, 0,  FLAGS },
++    { "device",      "running on device name",          OFFSET(device),          AV_OPT_TYPE_STRING, { .str = NULL},       0, 0, FLAGS },
++    { "interval",    "detect every Nth frame",          OFFSET(every_nth_frame), AV_OPT_TYPE_INT,    { .i64 = 1 },  1, 1024, FLAGS},
++    { "req_num",     "inference request number",        OFFSET(req_num),         AV_OPT_TYPE_INT,    { .i64 = 1 },  1, 1024, FLAGS},
++    { "batch_size",  "batch size per infer",            OFFSET(batch_size),      AV_OPT_TYPE_INT,    { .i64 = 1 },  1, 1024, FLAGS},
++    { "threshold",   "threshod to filter output data",  OFFSET(threshold),       AV_OPT_TYPE_FLOAT,  { .dbl = 0.5}, 0, 1,    FLAGS},
++
++    { NULL }
++};
++
++AVFILTER_DEFINE_CLASS(ie_detect);
++
++static const AVFilterPad detect_inputs[] = {
++    {
++        .name          = "default",
++        .type          = AVMEDIA_TYPE_VIDEO,
++    },
++    { NULL }
++};
++
++static const AVFilterPad detect_outputs[] = {
++    {
++        .name          = "default",
++        .type          = AVMEDIA_TYPE_VIDEO,
++    },
++    { NULL }
++};
++
++AVFilter ff_vf_ie_detect = {
++    .name          = "ie_detect",
++    .description   = NULL_IF_CONFIG_SMALL("OpenVINO IE detect filter."),
++    .priv_size     = sizeof(IeDetectContext),
++    .query_formats = query_formats,
++    .activate      = activate,
++    .init          = detect_init,
++    .uninit        = detect_uninit,
++    .inputs        = detect_inputs,
++    .outputs       = detect_outputs,
++    .priv_class    = &ie_detect_class,
++    .flags_internal = FF_FILTER_FLAG_HWFRAME_AWARE,
++};
+-- 
+2.7.4
+
