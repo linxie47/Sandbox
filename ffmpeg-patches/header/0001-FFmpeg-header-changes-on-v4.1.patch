@@ -1,0 +1,57 @@
+From b0f197efddeed8271155967fc1387ed06a022884 Mon Sep 17 00:00:00 2001
+From: Lin Xie <lin.xie@intel.com>
+Date: Mon, 10 Jun 2019 17:25:35 +0800
+Subject: [PATCH] FFmpeg header changes on v4.1
+
+---
+ libavutil/frame.h  | 14 ++++++++++++++
+ libavutil/pixfmt.h |  1 +
+ 2 files changed, 15 insertions(+)
+
+diff --git a/libavutil/frame.h b/libavutil/frame.h
+index e2a2929..b61a4dc 100644
+--- a/libavutil/frame.h
++++ b/libavutil/frame.h
+@@ -142,6 +142,10 @@ enum AVFrameSideDataType {
+      */
+     AV_FRAME_DATA_ICC_PROFILE,
+ 
++    AV_FRAME_DATA_INFERENCE_CLASSIFICATION,
++
++    AV_FRAME_DATA_INFERENCE_DETECTION,
++
+ #if FF_API_FRAME_QP
+     /**
+      * Implementation-specific description of the format of AV_FRAME_QP_TABLE_DATA.
+@@ -166,6 +170,16 @@ enum AVFrameSideDataType {
+      * function in libavutil/timecode.c.
+      */
+     AV_FRAME_DATA_S12M_TIMECODE,
++
++    /**
++     * Metadata relevant to rolling intra refresh.
++     */
++    AV_FRAME_DATA_RIR_FRAME,
++
++    /**
++      * VAAPI Encode skip-frame indicator.
++      */
++    AV_FRAME_DATA_SKIP_FRAME,
+ };
+ 
+ enum AVActiveFormatDescription {
+diff --git a/libavutil/pixfmt.h b/libavutil/pixfmt.h
+index 6815f8d..affb5c3 100644
+--- a/libavutil/pixfmt.h
++++ b/libavutil/pixfmt.h
+@@ -89,6 +89,7 @@ enum AVPixelFormat {
+     AV_PIX_FMT_NV12,      ///< planar YUV 4:2:0, 12bpp, 1 plane for Y and 1 plane for the UV components, which are interleaved (first byte U and the following byte V)
+     AV_PIX_FMT_NV21,      ///< as above, but U and V bytes are swapped
+ 
++    AV_PIX_FMT_RGBP,      ///< planar RGB 4:4:4 24bpp, 3 plane for R/G/B components
+     AV_PIX_FMT_ARGB,      ///< packed ARGB 8:8:8:8, 32bpp, ARGBARGB...
+     AV_PIX_FMT_RGBA,      ///< packed RGBA 8:8:8:8, 32bpp, RGBARGBA...
+     AV_PIX_FMT_ABGR,      ///< packed ABGR 8:8:8:8, 32bpp, ABGRABGR...
+-- 
+2.7.4
+
