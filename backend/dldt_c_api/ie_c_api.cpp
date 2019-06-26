@@ -91,6 +91,22 @@ void ie_output_info_set_precision(ie_output_info_t *info, const char *precision)
     info_impl->setPrecision(precision);
 }
 
+const void *ie_blob_get_data(ie_blob_t *blob) {
+    return blob->object->buffer();
+}
+
+dimensions_t *ie_blob_get_dims(ie_blob_t *blob) {
+    return &blob->dim;
+}
+
+IELayout ie_blob_get_layout(ie_blob_t *blob) {
+    return static_cast<IELayout>((int)blob->object->getTensorDesc().getLayout());
+}
+
+IEPrecision ie_blob_get_precision(ie_blob_t *blob) {
+    return static_cast<IEPrecision>((int)blob->object->getTensorDesc().getPrecision());
+}
+
 void infer_request_infer(infer_request_t *infer_request) {
     if (infer_request == nullptr)
         return;
@@ -282,6 +298,8 @@ ie_plugin_t *ie_plugin_create(const char *device) {
     plugin->device_name = ie_plugin_ptr->device_name.c_str();
     plugin->version = ie_plugin_ptr->version.c_str();
     plugin->object = ie_plugin_ptr;
+
+    std::cout << "Devivce:" << ie_plugin_ptr->device_name << " Ver:" << ie_plugin_ptr->version << std::endl;
 
     return plugin;
 }

@@ -61,6 +61,7 @@ struct ie_blobs {
 };
 
 const void *ie_blob_get_data(ie_blob_t *blob);
+dimensions_t *ie_blob_get_dims(ie_blob_t *blob);
 IELayout ie_blob_get_layout(ie_blob_t *blob);
 IEPrecision ie_blob_get_precision(ie_blob_t *blob);
 
