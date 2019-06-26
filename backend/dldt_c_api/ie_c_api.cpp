@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <assert.h>
 #include "ie_c_api.h"
 #include "ie_api_impl.hpp"
+#include <assert.h>
 
 namespace IEPY = InferenceEnginePython;
 
@@ -25,10 +25,10 @@ extern "C" {
 struct ie_network {
     const char *name;
     size_t batch_size;
-    void *plugin;
     void *object;
+    ie_plugin_t *plugin;
+    infer_requests_t *infer_requests;
     std::unique_ptr<InferenceEnginePython::IEExecNetwork> ie_exec_network;
-
     std::map<std::string, InferenceEnginePython::InputInfo> inputs;
     std::map<std::string, InferenceEnginePython::OutputInfo> outputs;
 };
@@ -38,6 +38,11 @@ struct ie_plugin {
     const char *device_name;
     const char *version;
     std::map<std::string, std::string> config;
+};
+
+struct ie_blob {
+    dimensions_t dim;
+    InferenceEngine::Blob::Ptr object;
 };
 
 namespace {
@@ -62,13 +67,93 @@ inline std::map<std::string, std::string> String2Map(std::string const &s) {
     return m;
 }
 
+void ie_input_info_set_precision(ie_input_info_t *info, const char *precision) {
+    if (info == nullptr || precision == nullptr)
+        return;
+
+    IEPY::InputInfo *info_impl = reinterpret_cast<IEPY::InputInfo *>(info->object);
+    info_impl->setPrecision(precision);
+}
+
+void ie_input_info_set_layout(ie_input_info_t *info, const char *layout) {
+    if (info == nullptr || layout == nullptr)
+        return;
+
+    IEPY::InputInfo *info_impl = reinterpret_cast<IEPY::InputInfo *>(info->object);
+    info_impl->setLayout(layout);
+}
+
+void ie_output_info_set_precision(ie_output_info_t *info, const char *precision) {
+    if (info == nullptr || precision == nullptr)
+        return;
+
+    IEPY::OutputInfo *info_impl = reinterpret_cast<IEPY::OutputInfo *>(info->object);
+    info_impl->setPrecision(precision);
+}
+
+void infer_request_infer(infer_request_t *infer_request) {
+    if (infer_request == nullptr)
+        return;
+
+    IEPY::InferRequestWrap *infer_wrap = reinterpret_cast<IEPY::InferRequestWrap *>(infer_request->object);
+    infer_wrap->infer();
+}
+
+void infer_request_infer_async(infer_request_t *infer_request) {
+    if (infer_request == nullptr)
+        return;
+
+    IEPY::InferRequestWrap *infer_wrap = reinterpret_cast<IEPY::InferRequestWrap *>(infer_request->object);
+    infer_wrap->infer_async();
+}
+
+int infer_request_wait(infer_request_t *infer_request, int64_t timeout) {
+    if (infer_request == nullptr)
+        return -1;
+
+    IEPY::InferRequestWrap *infer_wrap = reinterpret_cast<IEPY::InferRequestWrap *>(infer_request->object);
+    return infer_wrap->wait(timeout);
+}
+
+ie_blob_t *infer_request_get_blob(infer_request_t *infer_request, const char *name) {
+    if (infer_request == nullptr || name == nullptr)
+        return NULL;
+
+    IEPY::InferRequestWrap *infer_wrap = reinterpret_cast<IEPY::InferRequestWrap *>(infer_request->object);
+    InferenceEngine::Blob::Ptr blob_ptr;
+    try {
+        infer_wrap->getBlobPtr(name, blob_ptr);
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error("Can not get blob: " + std::string(name)));
+    }
+    ie_blob_t *_blob = new ie_blob_t;
+    assert(_blob);
+
+    const std::vector<size_t> dims = blob_ptr->getTensorDesc().getDims();
+
+    _blob->dim.ranks = dims.size();
+    for (size_t i = 0; i < _blob->dim.ranks; i++)
+        _blob->dim.dims[i] = dims[i];
+    _blob->object = blob_ptr;
+    return _blob;
+}
+
+void infer_request_put_blob(ie_blob_t *blob) {
+    if (blob == nullptr)
+        return;
+
+    delete blob;
+}
+
 ie_network_t *ie_network_create(ie_plugin_t *plugin, const char *model, const char *weights) {
-    ie_network_t *network = (decltype(network))malloc(sizeof(*network));
+    ie_network_t *network = new ie_network_t;
 
     assert(plugin && model && network);
-    std::string weights_file(weights);
+    std::string weights_file;
     if (weights == nullptr)
         weights_file = fileNameNoExt(model) + ".bin";
+    else
+        weights_file = weights;
 
     IEPY::IENetwork *ie_network_ptr = nullptr;
     try {
@@ -93,7 +178,15 @@ void ie_network_destroy(ie_network_t *network) {
     if (network->object)
         delete reinterpret_cast<IEPY::IENetwork *>(network->object);
 
-    free(network);
+    infer_requests_t *reqs = network->infer_requests;
+    if (reqs) {
+        for (size_t i = 0; i < reqs->req_num; i++)
+            free(reqs->infer_requests[i]);
+        free(reqs->infer_requests);
+        free(reqs);
+    }
+
+    delete network;
 }
 
 void ie_network_set_batch(ie_network_t *network, const size_t size) {
@@ -106,7 +199,7 @@ void ie_network_set_batch(ie_network_t *network, const size_t size) {
 }
 
 void ie_network_add_output(ie_network_t *network, const char *out_layer, const char *precision) {
-    //TODO
+    // TODO
 }
 
 ie_input_info_t ie_network_get_input(ie_network_t *network, const char *input_layer_name) {
@@ -114,14 +207,13 @@ ie_input_info_t ie_network_get_input(ie_network_t *network, const char *input_la
     if (network == nullptr)
         return info;
 
-    std::string input_layer_str = input_layer_name;
-    auto it = (input_layer_name == nullptr) ? network->inputs.begin() : network->inputs.find(input_layer_str);
+    auto it = (input_layer_name == nullptr) ? network->inputs.begin() : network->inputs.find(input_layer_name);
     if (it != network->inputs.end()) {
         info.name = it->first.c_str();
         IEPY::InputInfo *input_info = &it->second;
-        info.ranks = input_info->dims.size();
-        for (size_t i = 0; i < info.ranks; i++)
-            info.dims[i] = input_info->dims[i];
+        info.dim.ranks = input_info->dims.size();
+        for (size_t i = 0; i < info.dim.ranks; i++)
+            info.dim.dims[i] = input_info->dims[i];
         info.object = input_info;
     }
     return info;
@@ -132,21 +224,50 @@ ie_output_info_t ie_network_get_output(ie_network_t *network, const char *output
     if (network == nullptr)
         return info;
 
-    std::string output_layer_str = output_layer_name;
-    auto it = (output_layer_name == nullptr) ? network->outputs.begin() : network->outputs.find(output_layer_str);
+    auto it = (output_layer_name == nullptr) ? network->outputs.begin() : network->outputs.find(output_layer_name);
     if (it != network->outputs.end()) {
         info.name = it->first.c_str();
         IEPY::OutputInfo *output_info = &it->second;
-        info.ranks = output_info->dims.size();
-        for (size_t i = 0; i < info.ranks; i++)
-            info.dims[i] = output_info->dims[i];
+        info.dim.ranks = output_info->dims.size();
+        for (size_t i = 0; i < info.dim.ranks; i++)
+            info.dim.dims[i] = output_info->dims[i];
         info.object = output_info;
     }
     return info;
 }
 
+infer_requests_t *ie_network_create_infer_requests(ie_network_t *network, int num_requests) {
+    assert(network && network->plugin && num_requests > 0);
+
+    IEPY::IEPlugin *plugin = reinterpret_cast<IEPY::IEPlugin *>(network->plugin->object);
+    try {
+        network->ie_exec_network =
+            plugin->load(*reinterpret_cast<IEPY::IENetwork *>(network->object), num_requests, network->plugin->config);
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error("Failed to load network!"));
+    }
+
+    infer_requests_t *requests = (decltype(requests))malloc(sizeof(*requests));
+    infer_request_t **request_ptrs = (decltype(request_ptrs))malloc(num_requests * sizeof(infer_request_t *));
+
+    assert(requests && request_ptrs);
+
+    requests->req_num = num_requests;
+    for (int n = 0; n < num_requests; n++) {
+        request_ptrs[n] = (infer_request *)malloc(sizeof(infer_request_t));
+        assert(request_ptrs[n]);
+        request_ptrs[n]->object = &network->ie_exec_network->infer_requests[n];
+        request_ptrs[n]->network = network;
+    }
+    requests->infer_requests = request_ptrs;
+
+    network->infer_requests = requests;
+
+    return requests;
+}
+
 ie_plugin_t *ie_plugin_create(const char *device) {
-    ie_plugin_t *plugin = (decltype(plugin))malloc(sizeof(*plugin));
+    ie_plugin_t *plugin = new ie_plugin_t;
 
     assert(device && plugin);
 
@@ -172,7 +293,7 @@ void ie_plugin_destroy(ie_plugin_t *plugin) {
     if (plugin->object)
         delete reinterpret_cast<IEPY::IEPlugin *>(plugin->object);
 
-    free(plugin);
+    delete plugin;
 }
 
 void ie_plugin_set_config(ie_plugin *plugin, const char *ie_configs) {
@@ -192,7 +313,7 @@ void ie_plugin_add_cpu_extension(ie_plugin_t *plugin, const char *ext_path) {
     plugin_impl->addCpuExtension(ext_path);
 }
 
-}
+} // namespace
 
 #ifdef __cplusplus
 }

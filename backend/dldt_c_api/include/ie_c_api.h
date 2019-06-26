@@ -33,12 +33,18 @@ typedef struct infer_requests infer_requests_t;
 typedef struct ie_plugin ie_plugin_t;
 typedef struct ie_blob ie_blob_t;
 typedef struct ie_blobs ie_blobs_t;
+typedef struct dimensions dimensions_t;
+
+#define MAX_DIMENSIONS 8
+struct dimensions {
+    size_t ranks;
+    size_t dims[MAX_DIMENSIONS];
+};
 
 //// IE INPUT/OUTPUT INFO ////
 struct ie_info {
     const char *name;
-    size_t ranks;
-    size_t dims[8];
+    dimensions_t dim;
     void *object;
 };
 void ie_input_info_set_precision(ie_input_info_t *info, const char *precision);
@@ -49,32 +55,25 @@ void ie_output_info_set_precision(ie_output_info_t *info, const char *precision)
 struct ie_net_layer {};
 
 //// IE BLOB ////
-struct ie_blob {
-    char *name;
-    size_t ranks;
-    size_t dims[8];
-    IELayout layout;
-    IEPrecision precision; 
-    void *object;
-};
-const void *ie_blob_get_data(ie_blob_t *blob);
-IELayout *ie_blob_get_layout(ie_blob_t *blob);
-IEPrecision *ie_blob_get_precision(ie_blob_t *blob);
-
 struct ie_blobs {
     ie_blob_t **blobs;
     size_t blob_num;
 };
 
+const void *ie_blob_get_data(ie_blob_t *blob);
+IELayout ie_blob_get_layout(ie_blob_t *blob);
+IEPrecision ie_blob_get_precision(ie_blob_t *blob);
+
 //// INFER REQUEST ////
 struct infer_request {
     void *object;
+    ie_network_t *network;
 };
 void infer_request_infer(infer_request_t *infer_request);
 void infer_request_infer_async(infer_request_t *infer_request);
 int infer_request_wait(infer_request_t *infer_request, int64_t timeout);
 ie_blob_t *infer_request_get_blob(infer_request_t *infer_request, const char *name);
-ie_blobs_t *infer_request_get_all_blobs(infer_request_t *infer_request);
+void infer_request_put_blob(ie_blob_t *blob);
 
 struct infer_requests {
     infer_request_t **infer_requests;

@@ -61,20 +61,20 @@ if (NOT WIN32)
     target_link_libraries("${C_API_LIB}" m)
 endif()
 
+SET(CMAKE_BUILD_TYPE "Debug")
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
 
 include_directories(${C_API_LIB} SYSTEM PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
-set (install_headers
-    #${CMAKE_CURRENT_SOURCE_DIR}/include/ie_api_wrapper.h
-    #${CMAKE_CURRENT_SOURCE_DIR}/include/ie_common_wrapper.h
-    )
-set (DLDT_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt)
+set(install_headers ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_c_api.h)
+set(DLDT_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt)
 
 # tricky way to generate a dldt pkgconfig file to make compatible with open source dldt
 #configure_file("${CMAKE_CURRENT_SOURCE_DIR}/library_config/dldt.pc.in"
@@ -88,8 +88,6 @@ install(TARGETS "${C_API_LIB}" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 set_target_properties("${C_API_LIB}"
     PROPERTIES
     "CMAKE_CXX_FLAGS" "${CMAKE_CXX_FLAGS} -fPIE" COMPILE_PDB_NAME ${C_API_LIB})
-#        SOVERSION "${C_API_VERSION_SO}"
-#        VERSION "${PROJECT_VERSION}")
 
 target_link_libraries("${C_API_LIB}" IE::ie_cpu_extension ${InferenceEngine_LIBRARIES} dl)
 
