@@ -41,6 +41,7 @@ std::map<std::string, InferenceEngine::Layout> layout_map = {{"ANY",     Inferen
 #define IE_CHECK_CALL(expr) {                       \
     auto ret = (expr);                              \
     if (ret != InferenceEngine::StatusCode::OK) {   \
+        std::cout << response.msg << std::endl;     \
         THROW_IE_EXCEPTION << response.msg;         \
     }                                               \
 }                                                   \

@@ -87,8 +87,12 @@ void ie_network_destroy(ie_network_t *network);
 void ie_network_set_batch(ie_network_t *network, const size_t size);
 // void ie_network_add_output(ie_network_t *network, const char *out_layer, const char *precision);
 // ie_net_layer_t *ie_network_get_layer(ie_network_t *network, const char *layer_name);
-ie_input_info_t ie_network_get_input(ie_network_t *network, const char *input_name);
-ie_output_info_t ie_network_get_output(ie_network_t *network, const char *output_name);
+size_t ie_network_get_input_number(ie_network_t *network);
+size_t ie_network_get_output_number(ie_network_t *network);
+void ie_network_get_input(ie_network_t *network, ie_input_info_t *info, const char *input_layer_name);
+void ie_network_get_output(ie_network_t *network, ie_output_info_t *info ,const char *output_layer_name);
+void ie_network_get_all_inputs(ie_network_t *network, ie_input_info_t **const inputs_ptr);
+void ie_network_get_all_outputs(ie_network_t *network, ie_input_info_t **const outputs_ptr);
 infer_requests_t *ie_network_create_infer_requests(ie_network_t *network, int num_requests);
 
 //// IE PLUGIN ////

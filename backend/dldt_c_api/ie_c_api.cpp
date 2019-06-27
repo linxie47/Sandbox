@@ -16,7 +16,10 @@
 #include "ie_api_impl.hpp"
 #include <assert.h>
 
+#include <ext_list.hpp>
+
 namespace IEPY = InferenceEnginePython;
+namespace IE = InferenceEngine;
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,9 +31,9 @@ struct ie_network {
     void *object;
     ie_plugin_t *plugin;
     infer_requests_t *infer_requests;
-    std::unique_ptr<InferenceEnginePython::IEExecNetwork> ie_exec_network;
-    std::map<std::string, InferenceEnginePython::InputInfo> inputs;
-    std::map<std::string, InferenceEnginePython::OutputInfo> outputs;
+    std::unique_ptr<IEPY::IEExecNetwork> ie_exec_network;
+    std::map<std::string, IEPY::InputInfo> inputs;
+    std::map<std::string, IEPY::OutputInfo> outputs;
 };
 
 struct ie_plugin {
@@ -42,7 +45,7 @@ struct ie_plugin {
 
 struct ie_blob {
     dimensions_t dim;
-    InferenceEngine::Blob::Ptr object;
+    IE::Blob::Ptr object;
 };
 
 namespace {
@@ -218,38 +221,80 @@ void ie_network_add_output(ie_network_t *network, const char *out_layer, const c
     // TODO
 }
 
-ie_input_info_t ie_network_get_input(ie_network_t *network, const char *input_layer_name) {
-    ie_input_info_t info = {};
+size_t ie_network_get_input_number(ie_network_t *network) {
     if (network == nullptr)
-        return info;
+        return 0;
+
+    return network->inputs.size();
+}
+
+size_t ie_network_get_output_number(ie_network_t *network) {
+    if (network == nullptr)
+        return 0;
+
+    return network->outputs.size();
+}
+
+static inline void ConvertToInputInfo(std::map<std::string, IEPY::InputInfo>::iterator it, ie_info *info) {
+    info->name = it->first.c_str();
+    IEPY::InputInfo *input_info = &it->second;
+    info->dim.ranks = input_info->dims.size();
+    for (size_t i = 0; i < info->dim.ranks; i++)
+        info->dim.dims[i] = input_info->dims[i];
+    info->object = input_info;
+}
+
+static inline void ConvertToOutputInfo(std::map<std::string, IEPY::OutputInfo>::iterator it, ie_info *info) {
+    info->name = it->first.c_str();
+    IEPY::OutputInfo *output_info = &it->second;
+    info->dim.ranks = output_info->dims.size();
+    for (size_t i = 0; i < info->dim.ranks; i++)
+        info->dim.dims[i] = output_info->dims[i];
+    info->object = output_info;
+}
+
+void ie_network_get_input(ie_network_t *network, ie_input_info_t *info, const char *input_layer_name) {
+    if (network == nullptr || info == nullptr)
+        return;
 
     auto it = (input_layer_name == nullptr) ? network->inputs.begin() : network->inputs.find(input_layer_name);
     if (it != network->inputs.end()) {
-        info.name = it->first.c_str();
-        IEPY::InputInfo *input_info = &it->second;
-        info.dim.ranks = input_info->dims.size();
-        for (size_t i = 0; i < info.dim.ranks; i++)
-            info.dim.dims[i] = input_info->dims[i];
-        info.object = input_info;
+        ConvertToInputInfo(it, info);
     }
-    return info;
 }
 
-ie_output_info_t ie_network_get_output(ie_network_t *network, const char *output_layer_name) {
-    ie_output_info_t info = {};
-    if (network == nullptr)
-        return info;
+void ie_network_get_output(ie_network_t *network, ie_output_info_t *info ,const char *output_layer_name) {
+    if (network == nullptr || info == nullptr)
+        return;
 
     auto it = (output_layer_name == nullptr) ? network->outputs.begin() : network->outputs.find(output_layer_name);
     if (it != network->outputs.end()) {
-        info.name = it->first.c_str();
-        IEPY::OutputInfo *output_info = &it->second;
-        info.dim.ranks = output_info->dims.size();
-        for (size_t i = 0; i < info.dim.ranks; i++)
-            info.dim.dims[i] = output_info->dims[i];
-        info.object = output_info;
+        ConvertToOutputInfo(it, info);
     }
-    return info;
+}
+
+void ie_network_get_all_inputs(ie_network_t *network, ie_input_info_t **const inputs_ptr) {
+    if (network == nullptr || inputs_ptr == nullptr)
+        return;
+
+    size_t index = 0;
+    for (auto it = network->inputs.begin(); it != network->inputs.end(); it++) {
+        assert(inputs_ptr[index]);
+        ConvertToInputInfo(it, inputs_ptr[index]);
+        index++;
+    }
+}
+
+void ie_network_get_all_outputs(ie_network_t *network, ie_input_info_t **const outputs_ptr) {
+    if (network == nullptr || outputs_ptr == nullptr)
+        return;
+
+    size_t index = 0;
+    for (auto it = network->outputs.begin(); it != network->outputs.end(); it++) {
+        assert(outputs_ptr[index]);
+        ConvertToOutputInfo(it, outputs_ptr[index]);
+        index++;
+    }
 }
 
 infer_requests_t *ie_network_create_infer_requests(ie_network_t *network, int num_requests) {
@@ -324,11 +369,17 @@ void ie_plugin_set_config(ie_plugin *plugin, const char *ie_configs) {
 };
 
 void ie_plugin_add_cpu_extension(ie_plugin_t *plugin, const char *ext_path) {
-    if (!plugin || !ext_path)
+    if (!plugin)
         return;
 
     IEPY::IEPlugin *plugin_impl = reinterpret_cast<IEPY::IEPlugin *>(plugin->object);
-    plugin_impl->addCpuExtension(ext_path);
+
+    if (ext_path == nullptr) {
+        InferenceEngine::ResponseDesc response;
+        plugin_impl->actual->AddExtension(std::make_shared<InferenceEngine::Extensions::Cpu::CpuExtensions>(), &response);
+    } else {
+        plugin_impl->addCpuExtension(ext_path);
+    }
 }
 
 } // namespace
