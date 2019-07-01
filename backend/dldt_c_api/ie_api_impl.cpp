@@ -305,7 +305,7 @@ InferenceEnginePython::IEPlugin::load(const InferenceEnginePython::IENetwork &ne
                                                                                                  num_requests);
     IE_CHECK_CALL(actual->LoadNetwork(exec_network->actual, net.actual, config, &response))
 
-    for (size_t i = 0; i < num_requests; ++i) {
+    for (int i = 0; i < num_requests; ++i) {
         InferRequestWrap &infer_request = exec_network->infer_requests[i];
         IE_CHECK_CALL(exec_network->actual->CreateInferRequest(infer_request.request_ptr, &response))
     }

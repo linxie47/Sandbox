@@ -90,7 +90,7 @@ void ie_network_set_batch(ie_network_t *network, const size_t size);
 size_t ie_network_get_input_number(ie_network_t *network);
 size_t ie_network_get_output_number(ie_network_t *network);
 void ie_network_get_input(ie_network_t *network, ie_input_info_t *info, const char *input_layer_name);
-void ie_network_get_output(ie_network_t *network, ie_output_info_t *info ,const char *output_layer_name);
+void ie_network_get_output(ie_network_t *network, ie_output_info_t *info, const char *output_layer_name);
 void ie_network_get_all_inputs(ie_network_t *network, ie_input_info_t **const inputs_ptr);
 void ie_network_get_all_outputs(ie_network_t *network, ie_input_info_t **const outputs_ptr);
 infer_requests_t *ie_network_create_infer_requests(ie_network_t *network, int num_requests);
@@ -100,6 +100,7 @@ ie_plugin_t *ie_plugin_create(const char *device);
 void ie_plugin_destroy(ie_plugin_t *plugin);
 /* config string format: "A=1\nB=2\nC=3\n" */
 void ie_plugin_set_config(ie_plugin_t *plugin, const char *configs);
+const char *ie_plugin_get_config(ie_plugin_t *plugin, const char *config_key);
 void ie_plugin_add_cpu_extension(ie_plugin_t *plugin, const char *ext_path);
 
 #ifdef __cplusplus

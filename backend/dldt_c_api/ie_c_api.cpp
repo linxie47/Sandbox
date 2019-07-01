@@ -263,7 +263,7 @@ void ie_network_get_input(ie_network_t *network, ie_input_info_t *info, const ch
     }
 }
 
-void ie_network_get_output(ie_network_t *network, ie_output_info_t *info ,const char *output_layer_name) {
+void ie_network_get_output(ie_network_t *network, ie_output_info_t *info, const char *output_layer_name) {
     if (network == nullptr || info == nullptr)
         return;
 
@@ -360,23 +360,39 @@ void ie_plugin_destroy(ie_plugin_t *plugin) {
 }
 
 void ie_plugin_set_config(ie_plugin *plugin, const char *ie_configs) {
-    if (!plugin || !ie_configs)
+    if (plugin == nullptr || ie_configs == nullptr)
         return;
 
     IEPY::IEPlugin *plugin_impl = reinterpret_cast<IEPY::IEPlugin *>(plugin->object);
     plugin->config = String2Map(ie_configs);
-    plugin_impl->setConfig(plugin->config);
+    // TODO: Inference Engine asserts if unknown key passed
+    std::map<std::string, std::string> ie_config(plugin->config);
+    ie_config.erase("RESIZE_BY_INFERENCE");
+    ie_config.erase("CPU_EXTENSION");
+    plugin_impl->setConfig(ie_config);
 };
 
+const char *ie_plugin_get_config(ie_plugin_t *plugin, const char *config_key) {
+    if (plugin == nullptr || config_key == nullptr)
+        return nullptr;
+
+    auto it = plugin->config.find(config_key);
+    if (it != plugin->config.end())
+        return it->second.c_str();
+
+    return nullptr;
+}
+
 void ie_plugin_add_cpu_extension(ie_plugin_t *plugin, const char *ext_path) {
-    if (!plugin)
+    if (plugin == nullptr)
         return;
 
     IEPY::IEPlugin *plugin_impl = reinterpret_cast<IEPY::IEPlugin *>(plugin->object);
 
     if (ext_path == nullptr) {
         InferenceEngine::ResponseDesc response;
-        plugin_impl->actual->AddExtension(std::make_shared<InferenceEngine::Extensions::Cpu::CpuExtensions>(), &response);
+        plugin_impl->actual->AddExtension(std::make_shared<InferenceEngine::Extensions::Cpu::CpuExtensions>(),
+                                          &response);
     } else {
         plugin_impl->addCpuExtension(ext_path);
     }
