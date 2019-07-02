@@ -24,8 +24,17 @@ file (GLOB MAIN_HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/*.h
         )
 
+# Find OpenCV components if exist
+find_package(OpenCV COMPONENTS imgcodecs videoio imgproc  QUIET)
+if(NOT(OpenCV_FOUND))
+    message(WARNING "OPENCV is disabled or not found, " ${TARGET_NAME} " is built without OPENCV support")
+else()
+    add_definitions(-DUSE_OPENCV)
+endif()
+
 set(CMAKE_CXX_FLAGS "-std=c++11 -fpermissive ${CMAKE_CXX_FLAGS}")
 
 add_executable(${TARGET_NAME} ${MAIN_SRC} ${MAIN_HEADERS})
+target_link_libraries(${TARGET_NAME} ${OpenCV_LIBRARIES})
 target_link_libraries(${TARGET_NAME} gflags)
 target_link_libraries(${TARGET_NAME} dldt_ie_c_wrapper)
