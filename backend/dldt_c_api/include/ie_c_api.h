@@ -23,6 +23,24 @@ extern "C" {
 
 typedef enum { IE_LAYOUT_ANY = 0, IE_LAYOUT_NCHW = 1, IE_LAYOUT_NHWC = 2 } IELayout;
 typedef enum { IE_PRECISION_FP32 = 10, IE_PRECISION_U8 = 40 } IEPrecision;
+typedef enum {
+    IE_STATUS_OK = 0,
+    IE_STATUS_GENERAL_ERROR = -1,
+    IE_STATUS_NOT_IMPLEMENTED = -2,
+    IE_STATUS_NETWORK_NOT_LOADED = -3,
+    IE_STATUS_PARAMETER_MISMATCH = -4,
+    IE_STATUS_NOT_FOUND = -5,
+    IE_STATUS_OUT_OF_BOUNDS = -6,
+    /*
+     * @brief exception not of std::exception derived type was thrown
+     */
+    IE_STATUS_UNEXPECTED = -7,
+    IE_STATUS_REQUEST_BUSY = -8,
+    IE_STATUS_RESULT_NOT_READY = -9,
+    IE_STATUS_NOT_ALLOCATED = -10,
+    IE_STATUS_INFER_NOT_STARTED = -11,
+    IE_STATUS_NETWORK_NOT_READ = -12
+} IEStatusCode;
 
 typedef struct ie_info ie_input_info_t;
 typedef struct ie_info ie_output_info_t;
@@ -47,6 +65,9 @@ struct ie_info {
     dimensions_t dim;
     void *object;
 };
+
+const char *ie_info_get_name(const void *info);
+const dimensions_t *ie_info_get_dimensions(const void *info);
 void ie_input_info_set_precision(ie_input_info_t *info, const char *precision);
 void ie_input_info_set_layout(ie_input_info_t *info, const char *layout);
 void ie_output_info_set_precision(ie_output_info_t *info, const char *precision);
@@ -57,7 +78,7 @@ struct ie_net_layer {};
 //// IE BLOB ////
 struct ie_blobs {
     ie_blob_t **blobs;
-    size_t blob_num;
+    size_t num_blobs;
 };
 
 const void *ie_blob_get_data(ie_blob_t *blob);
@@ -66,20 +87,17 @@ IELayout ie_blob_get_layout(ie_blob_t *blob);
 IEPrecision ie_blob_get_precision(ie_blob_t *blob);
 
 //// INFER REQUEST ////
-struct infer_request {
-    void *object;
-    ie_network_t *network;
+struct infer_requests {
+    infer_request_t **requests;
+    size_t num_reqs;
 };
 void infer_request_infer(infer_request_t *infer_request);
 void infer_request_infer_async(infer_request_t *infer_request);
 int infer_request_wait(infer_request_t *infer_request, int64_t timeout);
+void *infer_request_get_blob_data(infer_request_t *infer_request, const char *name);
+void infer_request_get_blob_dims(infer_request_t *infer_request, const char *name, dimensions_t *dims);
 ie_blob_t *infer_request_get_blob(infer_request_t *infer_request, const char *name);
 void infer_request_put_blob(ie_blob_t *blob);
-
-struct infer_requests {
-    infer_request_t **infer_requests;
-    size_t req_num;
-};
 
 //// IE NETWORK ////
 ie_network_t *ie_network_create(ie_plugin_t *plugin, const char *model, const char *weights);
@@ -93,6 +111,10 @@ void ie_network_get_input(ie_network_t *network, ie_input_info_t *info, const ch
 void ie_network_get_output(ie_network_t *network, ie_output_info_t *info, const char *output_layer_name);
 void ie_network_get_all_inputs(ie_network_t *network, ie_input_info_t **const inputs_ptr);
 void ie_network_get_all_outputs(ie_network_t *network, ie_input_info_t **const outputs_ptr);
+/*
+ * \brief Creat infer requests and return requests array
+ * @return: (infer_requests *) - no memory allocation required for this value
+ */
 infer_requests_t *ie_network_create_infer_requests(ie_network_t *network, int num_requests);
 
 //// IE PLUGIN ////

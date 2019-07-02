@@ -25,6 +25,11 @@ namespace IE = InferenceEngine;
 extern "C" {
 #endif
 
+struct infer_request {
+    void *object;
+    ie_network_t *network;
+};
+
 struct ie_network {
     const char *name;
     size_t batch_size;
@@ -68,6 +73,18 @@ inline std::map<std::string, std::string> String2Map(std::string const &s) {
     }
 
     return m;
+}
+
+const char *ie_info_get_name(const void *info) {
+    if (info == nullptr)
+        return nullptr;
+    return ((const ie_info *)info)->name;
+}
+
+const dimensions_t *ie_info_get_dimensions(const void *info) {
+    if (info == nullptr)
+        return nullptr;
+    return &((const ie_info *)info)->dim;
 }
 
 void ie_input_info_set_precision(ie_input_info_t *info, const char *precision) {
@@ -134,9 +151,42 @@ int infer_request_wait(infer_request_t *infer_request, int64_t timeout) {
     return infer_wrap->wait(timeout);
 }
 
+void *infer_request_get_blob_data(infer_request_t *infer_request, const char *name) {
+    if (infer_request == nullptr || name == nullptr)
+        return nullptr;
+
+    IEPY::InferRequestWrap *infer_wrap = reinterpret_cast<IEPY::InferRequestWrap *>(infer_request->object);
+    InferenceEngine::Blob::Ptr blob_ptr;
+    try {
+        infer_wrap->getBlobPtr(name, blob_ptr);
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error("Can not get blob: " + std::string(name)));
+    }
+
+    return blob_ptr->buffer();
+}
+
+void infer_request_get_blob_dims(infer_request_t *infer_request, const char *name, dimensions_t *dims) {
+    if (infer_request == nullptr || name == nullptr || dims == nullptr)
+        return;
+
+    IEPY::InferRequestWrap *infer_wrap = reinterpret_cast<IEPY::InferRequestWrap *>(infer_request->object);
+    InferenceEngine::Blob::Ptr blob_ptr;
+    try {
+        infer_wrap->getBlobPtr(name, blob_ptr);
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error("Can not get blob: " + std::string(name)));
+    }
+
+    const std::vector<size_t> ie_dims = blob_ptr->getTensorDesc().getDims();
+    dims->ranks = ie_dims.size();
+    for (size_t i = 0; i < dims->ranks; i++)
+        dims->dims[i] = ie_dims[i];
+}
+
 ie_blob_t *infer_request_get_blob(infer_request_t *infer_request, const char *name) {
     if (infer_request == nullptr || name == nullptr)
-        return NULL;
+        return nullptr;
 
     IEPY::InferRequestWrap *infer_wrap = reinterpret_cast<IEPY::InferRequestWrap *>(infer_request->object);
     InferenceEngine::Blob::Ptr blob_ptr;
@@ -199,9 +249,9 @@ void ie_network_destroy(ie_network_t *network) {
 
     infer_requests_t *reqs = network->infer_requests;
     if (reqs) {
-        for (size_t i = 0; i < reqs->req_num; i++)
-            free(reqs->infer_requests[i]);
-        free(reqs->infer_requests);
+        for (size_t i = 0; i < reqs->num_reqs; i++)
+            free(reqs->requests[i]);
+        free(reqs->requests);
         free(reqs);
     }
 
@@ -313,14 +363,14 @@ infer_requests_t *ie_network_create_infer_requests(ie_network_t *network, int nu
 
     assert(requests && request_ptrs);
 
-    requests->req_num = num_requests;
+    requests->num_reqs = num_requests;
     for (int n = 0; n < num_requests; n++) {
         request_ptrs[n] = (infer_request *)malloc(sizeof(infer_request_t));
         assert(request_ptrs[n]);
         request_ptrs[n]->object = &network->ie_exec_network->infer_requests[n];
         request_ptrs[n]->network = network;
     }
-    requests->infer_requests = request_ptrs;
+    requests->requests = request_ptrs;
 
     network->infer_requests = requests;
 
