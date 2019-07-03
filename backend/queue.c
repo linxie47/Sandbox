@@ -1,8 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-
-#pragma once
+#include <stdlib.h>
 
 typedef struct _queue_entry queue_entry_t;
 typedef struct _queue queue_t;

@@ -267,6 +267,14 @@ void ie_network_set_batch(ie_network_t *network, const size_t size) {
     network->batch_size = size;
 }
 
+size_t ie_network_get_batch_size(ie_network_t *network) {
+    if (network == nullptr)
+        return 0;
+
+    IEPY::IENetwork *network_impl = reinterpret_cast<IEPY::IENetwork *>(network->object);
+    return network_impl->actual.getBatchSize();
+}
+
 void ie_network_add_output(ie_network_t *network, const char *out_layer, const char *precision) {
     // TODO
 }

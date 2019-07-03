@@ -1,9 +1,15 @@
+/*******************************************************************************
+ * Copyright (C) 2018-2019 Intel Corporation
+ *
+ * SPDX-License-Identifier: MIT
+ ******************************************************************************/
+
 #include "safe_queue.h"
-#include "queue.h"
 #include <assert.h>
+#include <pthread.h>
 #include <stdlib.h>
 
-#include <pthread.h>
+#include "queue.c"
 
 #define mutex_t pthread_mutex_t
 #define cond_t pthread_cond_t
@@ -56,7 +62,7 @@ void SafeQueueDestroy(SafeQueueT *sq) {
 void SafeQueuePush(SafeQueueT *sq, void *t) {
     mutex_lock(&sq->mutex);
     queue_push_back(sq->q, t);
-    cond_broadcast(&sq->cond);
+    cond_signal(&sq->cond);
     mutex_unlock(&sq->mutex);
 }
 
@@ -91,7 +97,7 @@ void *SafeQueuePop(SafeQueueT *sq) {
 }
 
 int SafeQueueEmpty(SafeQueueT *sq) {
-    int empty;
+    int empty = 0;
     mutex_lock(&sq->mutex);
     empty = (queue_count(sq->q) == 0);
     mutex_unlock(&sq->mutex);

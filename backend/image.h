@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-typedef enum MemoryType { MEM_TYPE_ANY = 0, MEM_TYPE_SYSTEM = 1, MEM_TYPE_OPENCL = 2 } MemoryType;
+typedef enum MemoryType { MEM_TYPE_ANY = 0, MEM_TYPE_SYSTEM = 1, MEM_TYPE_OPENCL = 2, MEM_TYPE_VAAPI = 3 } MemoryType;
 
 typedef enum FourCC {
     FOURCC_NV12 = 0x3231564E,
