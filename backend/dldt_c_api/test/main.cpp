@@ -132,15 +132,15 @@ int main(int argc, char *argv[])
     const char *outputPrecision = "FP32";
     ie_output_info_set_precision(&output_info, outputPrecision);
 // --------------------------- 7. Create infer request -------------------------------------------------
-    int num_requests = 2;
+    int num_requests = FLAGS_nireq;
     infer_requests_t *infer = ie_network_create_infer_requests(ie_network, num_requests);
-    infer_request_t *async_infer_request_next = infer->requests[0];
-    infer_request_t *async_infer_request_curr = infer->requests[1];
+    std::queue<infer_request_t *> available_infer, pending_infer;
+    for (size_t i = 0; i < num_requests; i++) {
+        available_infer.push(infer->requests[i]);
+    }
 
 // --------------------------- 8. Do inference --------------------------------------------------------
-    bool isAsyncMode = true;
     bool isLastFrame = false;
-    bool isModeChanged = false;
 
     typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
     auto total_t0 = std::chrono::high_resolution_clock::now();
@@ -157,62 +157,49 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (isAsyncMode) {
-            if (isModeChanged) {
-                frameToBlob(curr_frame, async_infer_request_curr, input_info.name);
-            }
-            if (!isLastFrame) {
-                frameToBlob(next_frame, async_infer_request_next, input_info.name);
-            }
-        } else if (!isModeChanged) {
-            frameToBlob(curr_frame, async_infer_request_curr, input_info.name);
-        }
+        if (available_infer.empty()) {
+            infer_request_t *async_infer_request = pending_infer.front();
 
-        if (isAsyncMode) {
-            if (isModeChanged) {
-                infer_request_infer_async(async_infer_request_curr);
-            }
-            if (!isLastFrame) {
-                infer_request_infer_async(async_infer_request_next);
-            }
-        } else if (!isModeChanged) {
-            infer_request_infer_async(async_infer_request_curr);
-        }
+            if (0 == infer_request_wait(async_infer_request,-1)) {
+                const float* detection = infer_request_get_blob_data(async_infer_request, output_info.name);
 
-        if (0 == infer_request_wait(async_infer_request_curr,-1)) {
-// ---------------------------9. Process output blobs--------------------------------------------------
-            const float* detection = infer_request_get_blob_data(async_infer_request_curr, output_info.name);
+                /* Each detection has image_id that denotes processed image */
+                for (int i = 0; i < maxProposalCount; i++) {
+                    auto image_id = static_cast<int>(detection[i * objectSize + 0]);
+                    if (image_id < 0) {
+                        break;
+                    }
 
-            /* Each detection has image_id that denotes processed image */
-            for (int i = 0; i < maxProposalCount; i++) {
-                auto image_id = static_cast<int>(detection[i * objectSize + 0]);
-                if (image_id < 0) {
-                    break;
+                    float confidence = detection[i * objectSize + 2];
+                    auto label = static_cast<int>(detection[i * objectSize + 1]);
+                    float xmin = static_cast<int>(detection[i * objectSize + 3] * width);
+                    float ymin = static_cast<int>(detection[i * objectSize + 4] * height);
+                    float xmax = static_cast<int>(detection[i * objectSize + 5] * width);
+                    float ymax = static_cast<int>(detection[i * objectSize + 6] * height);
+
+                    std::cout << "[" << i << "," << label << "] element, prob = " << confidence <<
+                        "    (" << xmin << "," << ymin << ")-(" << xmax << "," << ymax << ")" << " batch id : " << image_id << std::endl;
                 }
-
-                float confidence = detection[i * objectSize + 2];
-                auto label = static_cast<int>(detection[i * objectSize + 1]);
-                float xmin = static_cast<int>(detection[i * objectSize + 3] * width);
-                float ymin = static_cast<int>(detection[i * objectSize + 4] * height);
-                float xmax = static_cast<int>(detection[i * objectSize + 5] * width);
-                float ymax = static_cast<int>(detection[i * objectSize + 6] * height);
-
-                std::cout << "[" << i << "," << label << "] element, prob = " << confidence <<
-                    "    (" << xmin << "," << ymin << ")-(" << xmax << "," << ymax << ")" << " batch id : " << image_id << std::endl;
             }
+
+            pending_infer.pop();
+            available_infer.push(async_infer_request);
         }
+
+        infer_request_t *async_infer_request = available_infer.front();
+
+        if (!isLastFrame) {
+            frameToBlob(next_frame, async_infer_request, input_info.name);
+        }
+
+        if (!isLastFrame) {
+            infer_request_infer_async(async_infer_request);
+        }
+        available_infer.pop();
+        pending_infer.push(async_infer_request);
 
         if (isLastFrame) {
             break;
-        }
-        if (isModeChanged) {
-            isModeChanged = false;
-        }
-        // in the truly Async mode we swap the NEXT and CURRENT requests for the next iteration
-        curr_frame = next_frame;
-        next_frame = cv::Mat();
-        if (isAsyncMode) {
-            std::swap(async_infer_request_curr, async_infer_request_next);
         }
     }
     /** Show performace results **/

@@ -14,7 +14,7 @@ DEFINE_string(m, "", "Required. Path to IR .xml file");
 
 DEFINE_string(d, "CPU", "Device for inference, 'CPU' or 'GPU'");
 
-//DEFINE_int32(batch, 1, "Inference batch size");
+DEFINE_int32(nireq, 1, "Inference request number");
 
 //DEFINE_int32(queue, 0, "Inference queue size");
 
