@@ -28,7 +28,7 @@ static inline queue_entry_t *create_entry(queue_t *q) {
     return new_entry;
 }
 
-queue_t *queue_create() {
+static queue_t *queue_create() {
     queue_t *q = (queue_t *)malloc(sizeof(queue_t));
     if (!q)
         return NULL;
@@ -44,7 +44,7 @@ queue_t *queue_create() {
     return q;
 }
 
-void queue_destroy(queue_t *q) {
+static void queue_destroy(queue_t *q) {
     queue_entry_t *entry;
     if (!q)
         return;
@@ -62,11 +62,11 @@ void queue_destroy(queue_t *q) {
     free(q);
 }
 
-size_t queue_count(queue_t *q) {
+static size_t queue_count(queue_t *q) {
     return q ? q->length : 0;
 }
 
-void queue_push_front(queue_t *q, void *val) {
+static void queue_push_front(queue_t *q, void *val) {
     queue_entry_t *new_node = create_entry(q);
     queue_entry_t *original_next = q->head->next;
 
@@ -79,7 +79,7 @@ void queue_push_front(queue_t *q, void *val) {
     q->length++;
 }
 
-void queue_push_back(queue_t *q, void *val) {
+static void queue_push_back(queue_t *q, void *val) {
     queue_entry_t *new_node = create_entry(q);
     queue_entry_t *original_prev = q->tail->prev;
 
@@ -92,7 +92,7 @@ void queue_push_back(queue_t *q, void *val) {
     q->length++;
 }
 
-void *queue_pop_front(queue_t *q) {
+static void *queue_pop_front(queue_t *q) {
     queue_entry_t *front = q->head->next;
     queue_entry_t *new_head_next = front->next;
     void *ret = front->value;
@@ -107,7 +107,7 @@ void *queue_pop_front(queue_t *q) {
     return ret;
 }
 
-void *queue_pop_back(queue_t *q) {
+static void *queue_pop_back(queue_t *q) {
     queue_entry_t *back = q->tail->prev;
     queue_entry_t *new_tail_prev = back->prev;
     void *ret = back->value;
@@ -122,14 +122,14 @@ void *queue_pop_back(queue_t *q) {
     return ret;
 }
 
-void *queue_peek_front(queue_t *q) {
+static void *queue_peek_front(queue_t *q) {
     if (!q || q->length == 0)
         return NULL;
 
     return q->head->next->value;
 }
 
-void *queue_peek_back(queue_t *q) {
+static void *queue_peek_back(queue_t *q) {
     if (!q || q->length == 0)
         return NULL;
 

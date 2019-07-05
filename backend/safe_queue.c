@@ -112,13 +112,6 @@ void SafeQueueWaitEmpty(SafeQueueT *sq) {
     mutex_unlock(&sq->mutex);
 }
 
-void *SafeQueueActual(SafeQueueT *sq) {
-    if (!sq)
-        return (void *)NULL;
-
-    return sq->q;
-}
-
 #if 0
 
 #include <stdio.h>

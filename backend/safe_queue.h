@@ -25,7 +25,4 @@ int SafeQueueEmpty(SafeQueueT *sq);
 
 void SafeQueueWaitEmpty(SafeQueueT *sq);
 
-// Debug only
-void *SafeQueueActual(SafeQueueT *sq);
-
 #endif // __SAFE_QUEUE_H

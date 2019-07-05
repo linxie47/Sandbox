@@ -48,7 +48,7 @@ void frameToBlob(const cv::Mat& frame, infer_request_t *infer_request,
     size_t channels = dimenison.dims[1];
     size_t width = dimenison.dims[3];
     size_t height = dimenison.dims[2];
-    uint8_t *blob_data = infer_request_get_blob_data(infer_request, inputName);
+    uint8_t *blob_data = (uint8_t *)infer_request_get_blob_data(infer_request, inputName);
     cv::Mat resized_image;
     cv::resize(frame, resized_image, cv::Size(300, 300));
 
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
     int num_requests = FLAGS_nireq;
     infer_requests_t *infer = ie_network_create_infer_requests(ie_network, num_requests);
     std::queue<infer_request_t *> available_infer, pending_infer;
-    for (size_t i = 0; i < num_requests; i++) {
+    for (int i = 0; i < num_requests; i++) {
         available_infer.push(infer->requests[i]);
     }
 
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
             infer_request_t *async_infer_request = pending_infer.front();
 
             if (0 == infer_request_wait(async_infer_request,-1)) {
-                const float* detection = infer_request_get_blob_data(async_infer_request, output_info.name);
+                const float* detection = (const float *)infer_request_get_blob_data(async_infer_request, output_info.name);
 
                 /* Each detection has image_id that denotes processed image */
                 for (int i = 0; i < maxProposalCount; i++) {
