@@ -7,6 +7,8 @@
 #ifndef __FF_LIST_H
 #define __FF_LIST_H
 
+typedef void *iterator;
+
 typedef struct __ff_list {
     const void *opaque; // private data
 
@@ -20,7 +22,17 @@ typedef struct __ff_list {
 
     void *(*front)(void *thiz);
 
+    void *(*next)(void *thiz, void *current);
+
     int (*empty)(void *thiz);
+
+    unsigned long (*size)(void *thiz);
+
+    iterator (*iterator_get)(void *thiz);
+
+    iterator (*iterate_next)(void *thiz, iterator it);
+
+    void *(*iterate_value)(iterator it);
 } ff_list_t;
 
 ff_list_t *ff_list_alloc();

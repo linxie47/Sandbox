@@ -95,6 +95,8 @@ int main(int argc, char *argv[]) {
 
     // sleep(1);
 
+    context->inference->Flush(context);
+
     context->inference->Close(context);
 
     image_inference_free(context);

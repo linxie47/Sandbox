@@ -11,6 +11,23 @@ project(ImageInference)
 find_package(PkgConfig REQUIRED)
 include(FindPkgConfig)
 
+# ffmpeg
+pkg_check_modules(AVFORMAT REQUIRED "libavformat")
+include_directories(${AVFORMAT_INCLUDE_DIRS})
+link_directories(${AVFORMAT_LIBRARY_DIRS})
+
+pkg_check_modules(AVCODEC REQUIRED "libavcodec")
+include_directories(${AVCODEC_INCLUDE_DIRS})
+link_directories(${AVCODEC_LIBRARY_DIRS})
+
+pkg_check_modules(AVFILTER REQUIRED "libavfilter")
+include_directories(${AVFILTER_INCLUDE_DIRS})
+link_directories(${AVFILTER_LIBRARY_DIRS})
+
+pkg_check_modules(AVUTIL REQUIRED "libavutil")
+include_directories(${AVUTIL_INCLUDE_DIRS})
+link_directories(${AVUTIL_LIBRARY_DIRS})
+
 pkg_check_modules(SWSCALE REQUIRED "libswscale")
 include_directories(${SWSCALE_INCLUDE_DIRS})
 link_directories(${SWSCALE_LIBRARY_DIRS})
@@ -35,4 +52,6 @@ add_executable(${TARGET_NAME} ${HEADERS} ${SOURCES})
 # TODO: remove when it becomes a library
 add_subdirectory(dldt_c_api)
 
-target_link_libraries(${TARGET_NAME} swscale pthread dldt_ie_c_wrapper)
+target_link_libraries(${TARGET_NAME} pthread dldt_ie_c_wrapper)
+
+target_link_libraries(${TARGET_NAME} ${AVFORMAT_LIBRARIES} ${AVCODEC_LIBRARIES} ${AVFILTER_LIBRARIES} ${AVUTIL_LIBRARIES} ${SWSCALE_LIBRARIES})

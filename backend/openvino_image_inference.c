@@ -262,6 +262,14 @@ int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType type, co
 
     // TODO: handle allocator
 
+    vino->model_name = strdup(model);
+    if (!vino->model_name) {
+        VAII_ERROR("Copy model name failed!");
+        goto err;
+    }
+
+    pthread_mutex_init(&vino->flush_mutex, NULL);
+
     vino->callback = callback;
     pthread_create(&vino->working_thread, NULL, WorkingFunction, ctx);
 
@@ -344,6 +352,27 @@ int OpenVINOImageInferenceIsQueueFull(ImageInferenceContext *ctx) {
 }
 
 void OpenVINOImageInferenceFlush(ImageInferenceContext *ctx) {
+    OpenVINOImageInference *vino = (OpenVINOImageInference *)ctx->priv;
+    BatchRequest *request = NULL;
+
+    pthread_mutex_lock(&vino->flush_mutex);
+
+    if (vino->already_flushed) {
+        pthread_mutex_unlock(&vino->flush_mutex);
+        return;
+    }
+
+    vino->already_flushed = 1;
+
+    request = (BatchRequest *)SafeQueuePop(vino->freeRequests);
+    if (request->buffers.num_buffers > 0) {
+        // push the last request to infer
+        infer_request_infer_async(request->infer_request);
+        SafeQueuePush(vino->workingRequests, request);
+    }
+    SafeQueueWaitEmpty(vino->workingRequests);
+
+    pthread_mutex_unlock(&vino->flush_mutex);
 }
 
 void OpenVINOImageInferenceClose(ImageInferenceContext *ctx) {
@@ -381,6 +410,11 @@ void OpenVINOImageInferenceClose(ImageInferenceContext *ctx) {
         SafeQueueDestroy(vino->workingRequests);
     ie_network_destroy(vino->network);
     ie_plugin_destroy(vino->plugin);
+
+    if (vino->model_name)
+        free(vino->model_name);
+    
+    pthread_mutex_destroy(&vino->flush_mutex);
 
     pre_proc_free(vino->vpp_ctx);
 }

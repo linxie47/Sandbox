@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct _queue_entry queue_entry_t;
 typedef struct _queue queue_t;
@@ -26,6 +26,20 @@ static inline queue_entry_t *create_entry(queue_t *q) {
 
     new_entry->queue = q;
     return new_entry;
+}
+
+static queue_entry_t *queue_iterate(queue_t *q) {
+    queue_entry_t *it = q->head->next;
+    return it == q->tail ? NULL : it;
+}
+
+static queue_entry_t *queue_iterate_next(queue_t *q, queue_entry_t *it) {
+    queue_entry_t *next = it->next;
+    return next == q->tail ? NULL : next;
+}
+
+static void *queue_iterate_value(queue_entry_t *it) {
+    return it->value;
 }
 
 static queue_t *queue_create() {

@@ -42,6 +42,11 @@ typedef struct OutputBlobContext OutputBlobContext;
 typedef struct ImageInference ImageInference;
 typedef struct ImageInferenceContext ImageInferenceContext;
 
+/**
+ * \brief Callback function when a inference request completed.
+ * Image inference backend takes charge of memory management for @param Blobs and @param frames
+ * Caller is responsible to every IFramePtr after reinterpreted as customed data structure
+ */
 typedef void (*CallbackFunc)(OutputBlobArray *Blobs, UserDataBuffers *frames);
 typedef void (*PreProcessor)(Image *image);
 

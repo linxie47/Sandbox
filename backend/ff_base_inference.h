@@ -8,6 +8,7 @@
 
 #include <libavutil/frame.h>
 #include <stdint.h>
+#include "image_inference.h"
 
 typedef enum {
     INFERENCE_EVENT_NONE,
@@ -92,10 +93,75 @@ struct __OutputPostproc {
     AVBufferRef *labels;
 };
 
+typedef enum {
+    ANY = 0,
+    NCHW = 1,
+    NHWC = 2,
+} IELayout;
+
+typedef enum {
+    FP32 = 10,
+    U8 = 40,
+} IEPrecision;
+
+#define FF_TENSOR_MAX_RANK 8
+typedef struct _IETensorMeta {
+    IEPrecision precision;           /**< tensor precision */
+    int rank;                        /**< tensor rank */
+    size_t dims[FF_TENSOR_MAX_RANK]; /**< array describing tensor's dimensions */
+    IELayout layout;                 /**< tensor layout */
+    char *layer_name;                /**< tensor output layer name */
+    char *model_name;                /**< model name */
+    void *data;                      /**< tensor data */
+    size_t total_bytes;              /**< tensor size in bytes */
+    const char *element_id;          /**< id of pipeline element that produced current tensor */
+} IETensorMeta;
+
+/* dynamic labels array */
+typedef struct _LabelsArray {
+    char **label;
+    int num;
+} LabelsArray;
+
+typedef struct _InferDetection {
+    float x_min;
+    float y_min;
+    float x_max;
+    float y_max;
+    float confidence;
+    int label_id;
+    int object_id;
+    AVBufferRef *label_buf;
+} InferDetection;
+
+/* dynamic bounding boxes array */
+typedef struct _BBoxesArray {
+    InferDetection **bbox;
+    int num;
+} BBoxesArray;
+
+typedef struct _InferDetectionMeta {
+    BBoxesArray *bboxes;
+} InferDetectionMeta;
+
+typedef struct __InferenceROI {
+    AVFrame *frame;
+    FFVideoRegionOfInterestMeta roi;
+} InferenceROI;
+
+typedef struct __InferenceROIArray {
+    InferenceROI **infer_ROIs;
+    int num_infer_ROIs;
+} InferenceROIArray;
+
 #define MAX_MODEL_OUTPUT 4
 struct __ModelOutputPostproc {
     OutputPostproc procs[MAX_MODEL_OUTPUT];
 };
+
+typedef void (*PostProcFunction)(const OutputBlobArray *output_blobs, InferenceROIArray *infer_roi_array,
+                                 ModelOutputPostproc *model_postproc, const char *model_name,
+                                 const FFBaseInference *ff_base_inference);
 
 FFBaseInference *av_base_inference_create(const char *inference_id);
 

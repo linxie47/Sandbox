@@ -30,7 +30,7 @@ typedef struct OpenVINOImageInference {
     ie_output_info_t **outputs;
     size_t num_inputs;
     size_t num_outputs;
-    const char *model_name;
+    char *model_name;
     infer_requests_t *infer_requests;
 
     BatchRequest **batch_requests;
@@ -44,6 +44,9 @@ typedef struct OpenVINOImageInference {
 
     // VPP
     PreProcContext *vpp_ctx;
+
+    int already_flushed;
+    pthread_mutex_t flush_mutex;
 
 } OpenVINOImageInference;
 
