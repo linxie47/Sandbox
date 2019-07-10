@@ -53,6 +53,9 @@ typedef struct ie_blob ie_blob_t;
 typedef struct ie_blobs ie_blobs_t;
 typedef struct dimensions dimensions_t;
 
+/// GET IE C API VERSION ///
+const char *ie_c_api_version(void);
+
 #define MAX_DIMENSIONS 8
 struct dimensions {
     size_t ranks;

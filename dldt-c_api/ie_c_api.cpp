@@ -25,6 +25,10 @@ namespace IE = InferenceEngine;
 extern "C" {
 #endif
 
+#define IE_C_API_VERSION_MAJOR 1
+#define IE_C_API_VERSION_MINOR 1
+#define IE_C_API_VERSION_PATCH 0
+
 struct infer_request {
     void *object;
     ie_network_t *network;
@@ -73,6 +77,13 @@ inline std::map<std::string, std::string> String2Map(std::string const &s) {
     }
 
     return m;
+}
+
+const char *ie_c_api_version(void) {
+    std::ostringstream ostr;
+    ostr << IE_C_API_VERSION_MAJOR << "." << IE_C_API_VERSION_MINOR << "." << IE_C_API_VERSION_PATCH << std::ends;
+    std::string version = ostr.str();
+    return version.c_str();
 }
 
 const char *ie_info_get_name(const void *info) {
