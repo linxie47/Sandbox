@@ -61,8 +61,6 @@ if (NOT WIN32)
     target_link_libraries("${C_API_LIB}" m)
 endif()
 
-SET(CMAKE_BUILD_TYPE "Debug")
-
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")

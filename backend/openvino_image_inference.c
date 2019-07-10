@@ -416,7 +416,10 @@ void OpenVINOImageInferenceClose(ImageInferenceContext *ctx) {
     
     pthread_mutex_destroy(&vino->flush_mutex);
 
-    pre_proc_free(vino->vpp_ctx);
+    if (vino->vpp_ctx) {
+        vino->vpp_ctx->pre_proc->Destroy(vino->vpp_ctx);
+        pre_proc_free(vino->vpp_ctx);
+    }
 }
 
 static void *WorkingFunction(void *arg) {

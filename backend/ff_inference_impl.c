@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
 
-#include "inference_impl.h"
+#include "ff_inference_impl.h"
 #include "ff_base_inference.h"
 #include "ff_list.h"
 #include "image_inference.h"
@@ -161,6 +161,7 @@ static inline void PushOutput(FFInferenceImpl *impl) {
 
         processed->push_back(processed, frame);
         out->pop_front(out);
+        av_free(front);
     }
 }
 
@@ -186,7 +187,8 @@ static void InferenceCompletionCallback(OutputBlobArray *blobs, UserDataBuffers 
     }
 
     if (base->post_proc) {
-        ((PostProcFunction)base->post_proc)(blobs, &inference_frames_array, base->model_postproc, model->name, base);
+        ((PostProcFunction)base->post_proc)(blobs, &inference_frames_array, base->param.model_postproc, model->name,
+                                            base);
     }
 
     pthread_mutex_lock(&impl->output_frames_mutex);
@@ -224,15 +226,15 @@ static Model *CreateModel(FFBaseInference *base, const char *model_file, const c
     const OutputBlobMethod *method = output_blob_method_get_by_name("openvino");
     ImageInferenceContext *context = NULL;
 
-    av_log(NULL, AV_LOG_INFO, "Loading model: device=%s, path=%s\n", base->device, model_file);
-    av_log(NULL, AV_LOG_INFO, "Setting batch_size=%d, nireq=%d\n", base->batch_size, base->nireq);
+    av_log(NULL, AV_LOG_INFO, "Loading model: device=%s, path=%s\n", base->param.device, model_file);
+    av_log(NULL, AV_LOG_INFO, "Setting batch_size=%d, nireq=%d\n", base->param.batch_size, base->param.nireq);
 
     context = image_inference_alloc(inference, method, "ffmpeg-image-infer");
     model = (Model *)av_mallocz(sizeof(*model));
     av_assert0(context && model);
 
-    ret = context->inference->Create(context, MEM_TYPE_ANY, base->device, model_file, base->batch_size, base->nireq,
-                                     base->infer_config, NULL, InferenceCompletionCallback);
+    ret = context->inference->Create(context, MEM_TYPE_ANY, base->param.device, model_file, base->param.batch_size,
+                                     base->param.nireq, base->param.infer_config, NULL, InferenceCompletionCallback);
     av_assert0(ret == 0);
 
     model->infer_ctx = context;
@@ -244,10 +246,14 @@ static Model *CreateModel(FFBaseInference *base, const char *model_file, const c
 }
 
 static void ReleaseModel(Model *model) {
+    ImageInferenceContext *ii_ctx;
     if (!model)
         return;
 
-    image_inference_free(model->infer_ctx);
+    ii_ctx = model->infer_ctx;
+    ii_ctx->inference->Close(ii_ctx);
+    image_inference_free(ii_ctx);
+
     if (model->object_class)
         av_free(model->object_class);
     av_free(model);
@@ -301,10 +307,11 @@ FFInferenceImpl *FFInferenceImplCreate(FFBaseInference *ff_base_inference) {
     Model *dnn_model = NULL;
     FFInferenceImpl *impl = (typeof(impl))av_mallocz(sizeof(*impl));
 
-    av_assert0(impl && ff_base_inference && ff_base_inference->model);
+    av_assert0(impl && ff_base_inference && ff_base_inference->param.model);
 
-    dnn_model = CreateModel(ff_base_inference, ff_base_inference->model, ff_base_inference->model_proc,
-                            ff_base_inference->object_class);
+    dnn_model = CreateModel(ff_base_inference, ff_base_inference->param.model, ff_base_inference->param.model_proc,
+                            ff_base_inference->param.object_class);
+    dnn_model->infer_impl = impl;
 
     impl->model = dnn_model;
     impl->base_inference = ff_base_inference;
@@ -334,7 +341,7 @@ void FFInferenceImplRelease(FFInferenceImpl *impl) {
     av_free(impl);
 }
 
-int FFInferenceImplAddFrame(FFInferenceImpl *impl, AVFrame *frame) {
+int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
     const FFBaseInference *base_inference = impl->base_inference;
     ROIMetaArray metas = {};
     FFVideoRegionOfInterestMeta full_frame_meta = {};
@@ -343,14 +350,12 @@ int FFInferenceImplAddFrame(FFInferenceImpl *impl, AVFrame *frame) {
     int run_inference = 0;
 
     // Collect all ROI metas into std::vector
-    if (base_inference->is_full_frame) {
+    if (base_inference->param.is_full_frame) {
         full_frame_meta.x = 0;
         full_frame_meta.y = 0;
         full_frame_meta.w = frame->width;
         full_frame_meta.h = frame->height;
-        // av_dynarray_add(&metas.roi_metas, &metas.num_metas, &full_frame_meta);
-        metas.roi_metas[0] = &full_frame_meta;
-        metas.num_metas = 1;
+        av_dynarray_add(&metas.roi_metas, &metas.num_metas, &full_frame_meta);
     } else {
         AVFrameSideData *side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_INFERENCE_DETECTION);
         if (!side_data) {
@@ -383,9 +388,10 @@ int FFInferenceImplAddFrame(FFInferenceImpl *impl, AVFrame *frame) {
         }
     }
 
-    run_inference = !(inference_count == 0 ||
-                      // ff_base_inference->every_nth_frame == -1 || // TODO separate property instead of -1
-                      (base_inference->every_nth_frame > 0 && impl->frame_num % base_inference->every_nth_frame > 0));
+    run_inference =
+        !(inference_count == 0 ||
+          // ff_base_inference->every_nth_frame == -1 || // TODO separate property instead of -1
+          (base_inference->param.every_nth_frame > 0 && impl->frame_num % base_inference->param.every_nth_frame > 0));
 
 output:
     // push into output_frames queue
@@ -410,32 +416,34 @@ output:
     SubmitImages(impl, &metas, frame);
 
 exit:
-    if (!base_inference->is_full_frame) {
+    if (!base_inference->param.is_full_frame) {
         for (int n = 0; n < metas.num_metas; n++)
             av_free(metas.roi_metas[n]);
-        av_free(metas.roi_metas);
     }
+    av_free(metas.roi_metas);
 }
 
-int FFInferenceImplGetFrame(FFInferenceImpl *impl, AVFrame **frame) {
+int FFInferenceImplGetFrame(void *ctx, FFInferenceImpl *impl, AVFrame **frame) {
     ff_list_t *l = impl->processed_frames;
 
     if (l->empty(l) || !frame)
-        return 0;
+        return AVERROR(EAGAIN);
 
     *frame = (AVFrame *)l->front(l);
 
     l->pop_front(l);
+
+    return 0;
 }
 
-size_t FFInferenceImplGetQueueSize(FFInferenceImpl *impl) {
+size_t FFInferenceImplGetQueueSize(void *ctx, FFInferenceImpl *impl) {
     ff_list_t *out = impl->output_frames;
     ff_list_t *pro = impl->processed_frames;
-    printf("output:%zu processed:%zu\n", out->size(out), pro->size(pro));
+    av_log(ctx, AV_LOG_INFO, "output:%zu processed:%zu\n", out->size(out), pro->size(pro));
     return out->size(out) + pro->size(pro);
 }
 
-void FFInferenceImplSinkEvent(FFInferenceImpl *impl, FF_INFERENCE_EVENT event) {
+void FFInferenceImplSinkEvent(void *ctx, FFInferenceImpl *impl, FF_INFERENCE_EVENT event) {
     if (event == INFERENCE_EVENT_EOS) {
         impl->model->infer_ctx->inference->Flush(impl->model->infer_ctx);
     }

@@ -6,14 +6,24 @@
 
 #pragma once
 
+#include "image_inference.h"
 #include <libavutil/frame.h>
 #include <stdint.h>
-#include "image_inference.h"
 
 typedef enum {
     INFERENCE_EVENT_NONE,
     INFERENCE_EVENT_EOS,
 } FF_INFERENCE_EVENT;
+
+#ifndef TRUE
+/** The TRUE value of a UBool @stable ICU 2.0 */
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+/** The FALSE value of a UBool @stable ICU 2.0 */
+#define FALSE 0
+#endif
 
 typedef struct __FFBaseInference FFBaseInference;
 typedef struct __FFInferenceParam FFInferenceParam;
@@ -48,11 +58,7 @@ struct __FFBaseInference {
     // unique infer string id
     const char *inference_id;
 
-    // exposed options
-    FF_INFERENCE_OPTIONS
-
-    // internal options
-    int is_full_frame;
+    FFInferenceParam param;
 
     // other fields
     int initialized;
@@ -60,8 +66,6 @@ struct __FFBaseInference {
     void *pre_proc;         // type: PreProcFunction
     void *post_proc;        // type: PostProcFunction
     void *get_roi_pre_proc; // type: GetROIPreProcFunction
-    ModelInputPreproc *model_preproc;
-    ModelOutputPostproc *model_postproc;
 };
 
 /* ROI for analytics */
@@ -173,7 +177,7 @@ void av_base_inference_release(FFBaseInference *base);
 
 int av_base_inference_send_frame(void *ctx, FFBaseInference *base, AVFrame *frame);
 
-AVFrame *av_base_inference_get_frame(void *ctx, FFBaseInference *base);
+int av_base_inference_get_frame(void *ctx, FFBaseInference *base, AVFrame **frame_out);
 
 int av_base_inference_frame_queue_empty(void *ctx, FFBaseInference *base);
 

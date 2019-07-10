@@ -10,12 +10,12 @@ typedef struct __FFInferenceImpl FFInferenceImpl;
 
 FFInferenceImpl *FFInferenceImplCreate(FFBaseInference *ff_base_inference);
 
-int FFInferenceImplAddFrame(FFInferenceImpl *impl, AVFrame *frame);
-
-int FFInferenceImplGetFrame(FFInferenceImpl *impl, AVFrame **frame);
-
-size_t FFInferenceImplGetQueueSize(FFInferenceImpl *impl);
-
 void FFInferenceImplRelease(FFInferenceImpl *impl);
 
-void FFInferenceImplSinkEvent(FFInferenceImpl *impl, FF_INFERENCE_EVENT event);
+int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame);
+
+int FFInferenceImplGetFrame(void *ctx, FFInferenceImpl *impl, AVFrame **frame);
+
+size_t FFInferenceImplGetQueueSize(void *ctx, FFInferenceImpl *impl);
+
+void FFInferenceImplSinkEvent(void *ctx, FFInferenceImpl *impl, FF_INFERENCE_EVENT event);

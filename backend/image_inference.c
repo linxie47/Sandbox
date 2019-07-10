@@ -83,6 +83,8 @@ void image_inference_free(ImageInferenceContext *inference_context) {
 
     if (inference_context->priv)
         free(inference_context->priv);
+    if (inference_context->name)
+        free(inference_context->name);
     free(inference_context);
 }
 

@@ -1,3 +1,4 @@
+#include "ff_base_inference.h"
 #include "image_inference.h"
 #include <unistd.h>
 
@@ -46,6 +47,8 @@ static void InferenceCallback(OutputBlobArray *Blobs, UserDataBuffers *frames) {
     printf("frame num: %d\n", frames->num_buffers);
 }
 
+#include <libavutil/time.h>
+
 int main(int argc, char *argv[]) {
     if (argc < 4) {
         fprintf(stderr, "%s <model_name> <raw_image> <width> <height> \n", argv[0]);
@@ -62,7 +65,7 @@ int main(int argc, char *argv[]) {
     int height = g_height = atoi(argv[4]);
     int plane_size = width * height;
 
-    uint8_t *data = (uint8_t *)malloc(width * height * 3);
+    uint8_t *data = (uint8_t *)av_malloc(width * height * 3);
     fread(data, width * height * 3, 1, f_img);
     fclose(f_img);
 
@@ -93,8 +96,6 @@ int main(int argc, char *argv[]) {
 
     context->inference->SubmitImage(context, &image, frame, NULL);
 
-    // sleep(1);
-
     context->inference->Flush(context);
 
     context->inference->Close(context);
@@ -102,6 +103,49 @@ int main(int argc, char *argv[]) {
     image_inference_free(context);
 
     printf("Pass!\n");
+
+    FFBaseInference *infer_base = av_base_inference_create("ff_base_test");
+
+    FFInferenceParam infer_param = {};
+
+    infer_param.batch_size = 1;
+    infer_param.nireq = 2;
+    infer_param.model = argv[1];
+    infer_param.device = "CPU";
+    infer_param.every_nth_frame = 1;
+    infer_param.is_full_frame = TRUE;
+    infer_param.threshold = 0.5;
+
+    av_base_inference_set_params(infer_base, &infer_param);
+
+    AVFrame *av_frame = av_frame_alloc();
+    av_frame->width = width;
+    av_frame->height = height;
+    av_frame->format = AV_PIX_FMT_BGR0;
+    av_frame->data[0] = data;
+    av_frame->linesize[0] = width * 3;
+
+    av_base_inference_send_frame(NULL, infer_base, av_frame);
+
+    AVFrame *out_frame = NULL;
+    int ret = 0;
+again:
+    ret = av_base_inference_get_frame(NULL, infer_base, &out_frame);
+    if (ret != 0) {
+        av_usleep(10000);
+        printf("wait 10ms\n");
+        goto again;
+    }
+
+    if (out_frame) {
+        printf("in:%p out:%p\n", av_frame, out_frame);
+    }
+
+    av_base_inference_release(infer_base);
+
+    av_frame_free(&av_frame);
+
+    free(data);
 
     return 0;
 }
