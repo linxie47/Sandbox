@@ -32,6 +32,15 @@ pkg_check_modules(SWSCALE REQUIRED "libswscale")
 include_directories(${SWSCALE_INCLUDE_DIRS})
 link_directories(${SWSCALE_LIBRARY_DIRS})
 
+pkg_check_modules(SWSCALE REQUIRED "libswscale")
+include_directories(${SWSCALE_INCLUDE_DIRS})
+link_directories(${SWSCALE_LIBRARY_DIRS})
+
+# dldt_c_api
+pkg_check_modules(DLDT_C_API REQUIRED "dldt_c_api")
+include_directories(${DLDT_C_API_INCLUDE_DIRS})
+link_directories(${DLDT_C_API_LIBRARY_DIRS})
+
 file (GLOB SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.c
     )
@@ -49,9 +58,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_executable(${TARGET_NAME} ${HEADERS} ${SOURCES})
 
-# TODO: remove when it becomes a library
-add_subdirectory(dldt_c_api)
-
-target_link_libraries(${TARGET_NAME} pthread dldt_ie_c_wrapper)
+target_link_libraries(${TARGET_NAME} pthread ${DLDT_C_API_LIBRARIES})
 
 target_link_libraries(${TARGET_NAME} ${AVFORMAT_LIBRARIES} ${AVCODEC_LIBRARIES} ${AVFILTER_LIBRARIES} ${AVUTIL_LIBRARIES} ${SWSCALE_LIBRARIES})

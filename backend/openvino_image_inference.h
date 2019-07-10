@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "dldt_c_api/include/ie_c_api.h" //temp
+#include <ie_c_api.h>
 #include "image_inference.h"
 #include "pre_proc.h"
 #include "safe_queue.h"
