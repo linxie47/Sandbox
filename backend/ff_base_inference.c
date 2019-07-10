@@ -6,6 +6,7 @@
 
 #include "ff_base_inference.h"
 #include "ff_inference_impl.h"
+#include "ff_proc_factory.h"
 #include <libavutil/avassert.h>
 #include <libavutil/mem.h>
 
@@ -33,6 +34,7 @@ int av_base_inference_set_params(FFBaseInference *base, FFInferenceParam *param)
     base->param = *param;
     base->inference = (void *)FFInferenceImplCreate(base);
     base->initialized = TRUE;
+    base->post_proc = (void *)getPostProcFunctionByName(base->inference_id, base->param.model);
 
     return 0;
 }

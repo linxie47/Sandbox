@@ -2,7 +2,7 @@
 #include "image_inference.h"
 #include <unistd.h>
 
-#define CONFIGS "" //"CPU_EXTENSION=xxx\nCPU_THROUGHPUT_STREAMS=8\n"
+#define CONFIGS "CPU_THROUGHPUT_STREAMS=8\n"
 
 static int g_width, g_height;
 
@@ -45,6 +45,23 @@ static void InferenceCallback(OutputBlobArray *Blobs, UserDataBuffers *frames) {
     }
 
     printf("frame num: %d\n", frames->num_buffers);
+}
+
+static void dump_avframe_detect_side_data(AVFrame *frame) {
+    AVFrameSideData *side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_INFERENCE_DETECTION);
+    if (!side_data) {
+        return;
+    }
+
+    InferDetectionMeta *detect_meta = (InferDetectionMeta *)(side_data->data);
+    BBoxesArray *bboxes = detect_meta->bboxes;
+    if (bboxes) {
+        for (int i = 0; i < bboxes->num; i++) {
+            printf("label id: %d conf:%f rect: %d %d %d %d\n", bboxes->bbox[i]->label_id, bboxes->bbox[i]->confidence,
+                   (int)bboxes->bbox[i]->x_min, (int)bboxes->bbox[i]->y_min, (int)bboxes->bbox[i]->x_max,
+                   (int)bboxes->bbox[i]->y_max);
+        }
+    }
 }
 
 #include <libavutil/time.h>
@@ -104,7 +121,7 @@ int main(int argc, char *argv[]) {
 
     printf("Pass!\n");
 
-    FFBaseInference *infer_base = av_base_inference_create("ff_base_test");
+    FFBaseInference *infer_base = av_base_inference_create("ie_detect");
 
     FFInferenceParam infer_param = {};
 
@@ -121,7 +138,7 @@ int main(int argc, char *argv[]) {
     AVFrame *av_frame = av_frame_alloc();
     av_frame->width = width;
     av_frame->height = height;
-    av_frame->format = AV_PIX_FMT_BGR0;
+    av_frame->format = AV_PIX_FMT_BGR24;
     av_frame->data[0] = data;
     av_frame->linesize[0] = width * 3;
 
@@ -139,6 +156,7 @@ again:
 
     if (out_frame) {
         printf("in:%p out:%p\n", av_frame, out_frame);
+        dump_avframe_detect_side_data(out_frame);
     }
 
     av_base_inference_release(infer_base);
