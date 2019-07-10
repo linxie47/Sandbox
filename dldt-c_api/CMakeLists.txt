@@ -19,10 +19,8 @@ project(InferenceEngine_C_API)
 include(GNUInstallDirs)
 
 set(PROJECT_VERSION_MAJOR 1)
-set(PROJECT_VERSION_MINOR 0)
-set(PROJECT_VERSION_PATCH 1)
-set(C_API_VERSION_SO 1)
-
+set(PROJECT_VERSION_MINOR 1)
+set(PROJECT_VERSION_PATCH 0)
 set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
 # Find InferenceEngine
@@ -35,8 +33,8 @@ include_directories(${InferenceEngine_INCLUDE_DIRS})
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
-#inference_engine_c_wrapper
-set(C_API_LIB dldt_ie_c_wrapper)
+#inference_engine_c_api
+set(C_API_LIB inference_engine_c_api)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -72,14 +70,13 @@ include_directories(${C_API_LIB} SYSTEM PRIVATE
 )
 
 set(install_headers ${CMAKE_CURRENT_SOURCE_DIR}/include/ie_c_api.h)
-set(DLDT_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt)
+set(DLDT_C_API_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_FULL_INCLUDEDIR}/dldt)
 
-# tricky way to generate a dldt pkgconfig file to make compatible with open source dldt
-#configure_file("${CMAKE_CURRENT_SOURCE_DIR}/library_config/dldt.pc.in"
-#    "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" @ONLY)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/library_config/dldt_c_api.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/dldt_c_api.pc" @ONLY)
 
-install(FILES ${install_headers} DESTINATION ${DLDT_INSTALL_INCLUDEDIR})
-#install(FILES "${CMAKE_CURRENT_BINARY_DIR}/dldt.pc" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig")
+install(FILES ${install_headers} DESTINATION ${DLDT_C_API_INSTALL_INCLUDEDIR})
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/dldt_c_api.pc" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}/pkgconfig")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ie_cpu_extension/libcpu_extension.so" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 install(TARGETS "${C_API_LIB}" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 
@@ -89,4 +86,6 @@ set_target_properties("${C_API_LIB}"
 
 target_link_libraries("${C_API_LIB}" IE::ie_cpu_extension ${InferenceEngine_LIBRARIES} dl)
 
-add_subdirectory(test)
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    add_subdirectory(test)
+endif()
