@@ -55,7 +55,7 @@ ImageInferenceContext *image_inference_alloc(const ImageInference *infernce, con
     if (infernce == NULL)
         return NULL;
 
-    ret = (typeof(ret))malloc(sizeof(*ret));
+    ret = (ImageInferenceContext *)malloc(sizeof(*ret));
     if (!ret)
         return NULL;
     memset(ret, 0, sizeof(*ret));
@@ -108,7 +108,7 @@ OutputBlobContext *output_blob_alloc(const OutputBlobMethod *obm) {
     if (obm == NULL)
         return NULL;
 
-    ret = (typeof(ret))malloc(sizeof(*ret));
+    ret = (OutputBlobContext *)malloc(sizeof(*ret));
     if (!ret)
         return NULL;
     memset(ret, 0, sizeof(*ret));

@@ -88,7 +88,7 @@ PreProcContext *pre_proc_alloc(const PreProc *pre_proc) {
     if (pre_proc == NULL)
         return NULL;
 
-    ret = (typeof(ret))malloc(sizeof(*ret));
+    ret = (PreProcContext *)malloc(sizeof(*ret));
     if (!ret)
         return NULL;
     memset(ret, 0, sizeof(*ret));

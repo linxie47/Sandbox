@@ -102,18 +102,18 @@ static inline int avFormatToFourCC(int format) {
     case AV_PIX_FMT_BGR24:
         VAII_DEBUG("AV_PIX_FMT_BGR24");
         return FOURCC_BGR;
-#if VA_MAJOR_VERSION >= 1
+// #if VA_MAJOR_VERSION >= 1
     case AV_PIX_FMT_YUV420P:
         VAII_DEBUG("AV_PIX_FMT_YUV420P");
         return FOURCC_I420;
-#endif
+// #endif
     }
 
     av_log(NULL, AV_LOG_ERROR, "Unsupported AV Format: %d.", format);
     return 0;
 }
 
-void ff_buffer_map(AVFrame *frame, Image *image, MemoryType memoryType) {
+static void ff_buffer_map(AVFrame *frame, Image *image, MemoryType memoryType) {
 #ifdef DISABLE_VAAPI
     (void)(memoryType);
 #endif
@@ -263,7 +263,7 @@ static void SubmitImage(Model *model, FFVideoRegionOfInterestMeta *meta, Image *
     ImageInferenceContext *s = model->infer_ctx;
     PreProcessor preProcessFunction = NULL;
 
-    InferenceResult *result = (typeof(result))malloc(sizeof(*result));
+    InferenceResult *result = (InferenceResult *)malloc(sizeof(*result));
     av_assert0(result);
     result->inference_frame.frame = frame;
     result->inference_frame.roi = *meta;
@@ -305,7 +305,7 @@ static int SubmitImages(FFInferenceImpl *impl, const ROIMetaArray *metas, AVFram
 
 FFInferenceImpl *FFInferenceImplCreate(FFBaseInference *ff_base_inference) {
     Model *dnn_model = NULL;
-    FFInferenceImpl *impl = (typeof(impl))av_mallocz(sizeof(*impl));
+    FFInferenceImpl *impl = (FFInferenceImpl *)av_mallocz(sizeof(*impl));
 
     av_assert0(impl && ff_base_inference && ff_base_inference->param.model);
 
@@ -357,6 +357,8 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
         full_frame_meta.h = frame->height;
         av_dynarray_add(&metas.roi_metas, &metas.num_metas, &full_frame_meta);
     } else {
+        BBoxesArray *bboxes =NULL;
+        InferDetectionMeta *detect_meta = NULL;
         AVFrameSideData *side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_INFERENCE_DETECTION);
         if (!side_data) {
             // No ROI
@@ -364,12 +366,12 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
             goto output;
         }
 
-        InferDetectionMeta *detect_meta = (InferDetectionMeta *)(side_data->data);
+        detect_meta = (InferDetectionMeta *)(side_data->data);
         av_assert0(detect_meta);
-        BBoxesArray *bboxes = detect_meta->bboxes;
+        bboxes = detect_meta->bboxes;
         if (bboxes) {
             for (int i = 0; i < bboxes->num; i++) {
-                FFVideoRegionOfInterestMeta *roi_meta = (typeof(roi_meta))av_malloc(sizeof(*roi_meta));
+                FFVideoRegionOfInterestMeta *roi_meta = (FFVideoRegionOfInterestMeta *)av_malloc(sizeof(*roi_meta));
                 roi_meta->x = bboxes->bbox[i]->x_min;
                 roi_meta->y = bboxes->bbox[i]->y_min;
                 roi_meta->w = bboxes->bbox[i]->x_max - bboxes->bbox[i]->x_min;
@@ -396,7 +398,7 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
 output:
     // push into output_frames queue
     {
-        OutputFrame *output_frame = (typeof(output_frame))av_malloc(sizeof(*output_frame));
+        OutputFrame *output_frame = (OutputFrame *)av_malloc(sizeof(*output_frame));
         pthread_mutex_lock(&impl->output_frames_mutex);
 
         output_frame->frame = frame;
@@ -421,6 +423,7 @@ exit:
             av_free(metas.roi_metas[n]);
     }
     av_free(metas.roi_metas);
+    return 0;
 }
 
 int FFInferenceImplGetFrame(void *ctx, FFInferenceImpl *impl, AVFrame **frame) {

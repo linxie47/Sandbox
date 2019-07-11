@@ -108,12 +108,18 @@ struct OutputBlobArray {
 };
 
 #define __STRING(x) #x
+
+#ifdef __cplusplus
 #define __CONFIG_KEY(name) KEY_##name
 #define __DECLARE_CONFIG_KEY(name) static const char *__CONFIG_KEY(name) = __STRING(name)
-
 __DECLARE_CONFIG_KEY(CPU_EXTENSION);          // library with implementation of custom layers
 __DECLARE_CONFIG_KEY(CPU_THROUGHPUT_STREAMS); // number inference requests running in parallel
 __DECLARE_CONFIG_KEY(RESIZE_BY_INFERENCE);    // experimental, don't use
+#else
+#define KEY_CPU_EXTENSION __STRING(CPU_EXTENSION)                   // library with implementation of custom layers
+#define KEY_CPU_THROUGHPUT_STREAMS __STRING(CPU_THROUGHPUT_STREAMS) // number inference requests running in parallel
+#define KEY_RESIZE_BY_INFERENCE __STRING(RESIZE_BY_INFERENCE)       // experimental, don't use
+#endif
 
 const ImageInference *image_inference_get_by_name(const char *name);
 

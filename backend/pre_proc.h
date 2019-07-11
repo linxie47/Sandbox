@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "image.h"
 
 typedef struct PreProcContext PreProcContext;

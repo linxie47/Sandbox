@@ -42,7 +42,7 @@ static void *queue_iterate_value(queue_entry_t *it) {
     return it->value;
 }
 
-static queue_t *queue_create() {
+static queue_t *queue_create(void) {
     queue_t *q = (queue_t *)malloc(sizeof(queue_t));
     if (!q)
         return NULL;

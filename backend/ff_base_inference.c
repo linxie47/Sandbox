@@ -11,7 +11,7 @@
 #include <libavutil/mem.h>
 
 FFBaseInference *av_base_inference_create(const char *inference_id) {
-    FFBaseInference *base_inference = (typeof(base_inference))av_mallocz(sizeof(*base_inference));
+    FFBaseInference *base_inference = (FFBaseInference *)av_mallocz(sizeof(*base_inference));
 
     base_inference->inference_id = inference_id ? av_strdup(inference_id) : NULL;
 

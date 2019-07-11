@@ -47,7 +47,7 @@ static size_t _ff_list_size(void *thiz) {
     return queue_count((queue_t *)((ff_list_t *)thiz)->opaque);
 }
 
-ff_list_t *ff_list_alloc() {
+ff_list_t *ff_list_alloc(void) {
     ff_list_t *thiz = (ff_list_t *)malloc(sizeof(*thiz));
     if (!thiz)
         return NULL;

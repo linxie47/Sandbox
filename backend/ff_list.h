@@ -35,7 +35,7 @@ typedef struct __ff_list {
     void *(*iterate_value)(iterator it);
 } ff_list_t;
 
-ff_list_t *ff_list_alloc();
+ff_list_t *ff_list_alloc(void);
 void ff_list_free(ff_list_t *thiz);
 
 #endif // __FF_LIST_H

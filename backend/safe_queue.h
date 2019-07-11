@@ -9,7 +9,7 @@
 
 typedef struct _SafeQueue SafeQueueT;
 
-SafeQueueT *SafeQueueCreate();
+SafeQueueT *SafeQueueCreate(void);
 
 void SafeQueueDestroy(SafeQueueT *sq);
 

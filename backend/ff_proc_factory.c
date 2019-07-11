@@ -91,7 +91,6 @@ static void ExtractBoundingBoxes(const OutputBlobArray *blob_array, InferenceROI
             {
                 FFVideoRegionOfInterestMeta *roi = &infer_roi_array->infer_ROIs[image_id]->roi;
                 InferDetection *new_bbox = (InferDetection *)av_mallocz(sizeof(*new_bbox));
-                av_assert0(new_bbox);
 
                 int width = roi->w;
                 int height = roi->h;
@@ -109,6 +108,7 @@ static void ExtractBoundingBoxes(const OutputBlobArray *blob_array, InferenceROI
                 if (iy_max > height)
                     iy_max = height;
 
+                av_assert0(new_bbox);
                 new_bbox->x_min = ix_min;
                 new_bbox->y_min = iy_min;
                 new_bbox->x_max = ix_max;
