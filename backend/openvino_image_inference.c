@@ -170,6 +170,7 @@ static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType t
     if (configs) {
         const char *resize_by_vino = NULL;
         ie_plugin_set_config(vino->plugin, configs);
+        // printf("KEY_CPU_THREADS_NUM:%s\n", ie_plugin_get_config(vino->plugin, KEY_CPU_THREADS_NUM));
         // printf("KEY_CPU_THROUGHPUT_STREAMS:%s\n", ie_plugin_get_config(vino->plugin, KEY_CPU_THROUGHPUT_STREAMS));
         resize_by_vino = ie_plugin_get_config(vino->plugin, KEY_RESIZE_BY_INFERENCE);
         vino->resize_by_inference = (resize_by_vino && !strcmp(resize_by_vino, "TRUE")) ? 1 : 0;

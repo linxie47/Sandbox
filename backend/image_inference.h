@@ -113,10 +113,12 @@ struct OutputBlobArray {
 #define __CONFIG_KEY(name) KEY_##name
 #define __DECLARE_CONFIG_KEY(name) static const char *__CONFIG_KEY(name) = __STRING(name)
 __DECLARE_CONFIG_KEY(CPU_EXTENSION);          // library with implementation of custom layers
+__DECLARE_CONFIG_KEY(CPU_THREADS_NUM);        // threads number CPU plugin use for inference
 __DECLARE_CONFIG_KEY(CPU_THROUGHPUT_STREAMS); // number inference requests running in parallel
 __DECLARE_CONFIG_KEY(RESIZE_BY_INFERENCE);    // experimental, don't use
 #else
 #define KEY_CPU_EXTENSION __STRING(CPU_EXTENSION)                   // library with implementation of custom layers
+#define KEY_CPU_THREADS_NUM __STRING(CPU_THREADS_NUM)               // threads number CPU plugin use for inference
 #define KEY_CPU_THROUGHPUT_STREAMS __STRING(CPU_THROUGHPUT_STREAMS) // number inference requests running in parallel
 #define KEY_RESIZE_BY_INFERENCE __STRING(RESIZE_BY_INFERENCE)       // experimental, don't use
 #endif

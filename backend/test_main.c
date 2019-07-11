@@ -2,7 +2,7 @@
 #include "image_inference.h"
 #include <unistd.h>
 
-#define CONFIGS "CPU_THROUGHPUT_STREAMS=8\n"
+#define CONFIGS "CPU_THREADS_NUM=8\nCPU_THROUGHPUT_STREAMS=8\n"
 
 static int g_width, g_height;
 

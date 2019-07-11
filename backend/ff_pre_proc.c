@@ -51,6 +51,8 @@ static inline enum AVPixelFormat FOURCC2FFmpegFormat(int format) {
         return AV_PIX_FMT_BGRA;
     case FOURCC_BGR:
         return AV_PIX_FMT_BGR24;
+    case FOURCC_RGBP:
+        return AV_PIX_FMT_RGBP;
     case FOURCC_I420:
         return AV_PIX_FMT_YUV420P;
     }
@@ -70,17 +72,23 @@ static void FFPreProcConvert(PreProcContext *context, const Image *src, Image *d
     if (src->format == dst->format && src->format == FOURCC_RGBP && src->width == dst->width &&
         src->height == dst->height) {
         int planes_count = GetPlanesCount(src->format);
+        // RGB->BGR
+        Image src_bgr = *src;
+        src_bgr.planes[0] = src->planes[2];
+        src_bgr.planes[2] = src->planes[0];
         for (int i = 0; i < planes_count; i++) {
-            if (src->width == src->stride[i]) {
-                memcpy(dst->planes[i], src->planes[i], src->width * src->height * sizeof(uint8_t));
+            if (src_bgr.width == src_bgr.stride[i]) {
+                memcpy(dst->planes[i], src_bgr.planes[i], src_bgr.width * src_bgr.height * sizeof(uint8_t));
             } else {
-                int dst_stride = src->width * sizeof(uint8_t);
-                int src_stride = src->stride[i] * sizeof(uint8_t);
-                for (int r = 0; r < src->height; r++) {
-                    memcpy(dst->planes[i] + r * dst_stride, src->planes[i] + r * src_stride, dst_stride);
+                int dst_stride = dst->stride[i] * sizeof(uint8_t);
+                int src_stride = src_bgr.stride[i] * sizeof(uint8_t);
+                for (int r = 0; r < src_bgr.height; r++) {
+                    memcpy(dst->planes[i] + r * dst_stride, src_bgr.planes[i] + r * src_stride, dst->width);
                 }
             }
         }
+
+        return;
     }
 
     sws_context = sws_getCachedContext(sws_context, src->width, src->height, FOURCC2FFmpegFormat(src->format),

@@ -102,11 +102,12 @@ static inline int avFormatToFourCC(int format) {
     case AV_PIX_FMT_BGR24:
         VAII_DEBUG("AV_PIX_FMT_BGR24");
         return FOURCC_BGR;
-// #if VA_MAJOR_VERSION >= 1
+    case AV_PIX_FMT_RGBP:
+        VAII_DEBUG("AV_PIX_FMT_RGBP");
+        return FOURCC_RGBP;
     case AV_PIX_FMT_YUV420P:
         VAII_DEBUG("AV_PIX_FMT_YUV420P");
         return FOURCC_I420;
-// #endif
     }
 
     av_log(NULL, AV_LOG_ERROR, "Unsupported AV Format: %d.", format);
@@ -357,7 +358,7 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
         full_frame_meta.h = frame->height;
         av_dynarray_add(&metas.roi_metas, &metas.num_metas, &full_frame_meta);
     } else {
-        BBoxesArray *bboxes =NULL;
+        BBoxesArray *bboxes = NULL;
         InferDetectionMeta *detect_meta = NULL;
         AVFrameSideData *side_data = av_frame_get_side_data(frame, AV_FRAME_DATA_INFERENCE_DETECTION);
         if (!side_data) {

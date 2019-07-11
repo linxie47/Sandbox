@@ -9,9 +9,14 @@
 #include <string.h>
 
 static VAIILogFuncPtr inference_log_function = NULL;
+static int inference_log_level = VAII_INFO_LOG_LEVEL;
 
 void set_log_function(VAIILogFuncPtr log_func) {
     inference_log_function = log_func;
+};
+
+void set_log_level(int level) {
+    inference_log_level = level;
 };
 
 void debug_log(int level, const char *file, const char *function, int line, const char *message) {

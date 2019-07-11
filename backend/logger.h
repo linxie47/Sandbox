@@ -32,6 +32,8 @@ typedef void (*VAIILogFuncPtr)(int level, const char *file, const char *function
 
 void set_log_function(VAIILogFuncPtr log_func);
 
+void set_log_level(int level);
+
 void debug_log(int level, const char *file, const char *function, int line, const char *message);
 
 void default_log_function(int level, const char *file, const char *function, int line, const char *message);

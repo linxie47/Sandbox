@@ -7,8 +7,16 @@
 #include "ff_base_inference.h"
 #include "ff_inference_impl.h"
 #include "ff_proc_factory.h"
+#include "logger.h"
 #include <libavutil/avassert.h>
 #include <libavutil/mem.h>
+
+static void ff_log_function(int level, const char *file, const char *function, int line, const char *message) {
+    int log_levels[] = {AV_LOG_QUIET, AV_LOG_ERROR, AV_LOG_WARNING, AV_LOG_VERBOSE, AV_LOG_INFO,
+                        AV_LOG_DEBUG, AV_LOG_INFO,  AV_LOG_TRACE,   AV_LOG_PANIC};
+
+    av_log(NULL, log_levels[level], "%s:%i : %s \t %s \n", file, line, function, message);
+}
 
 FFBaseInference *av_base_inference_create(const char *inference_id) {
     FFBaseInference *base_inference = (FFBaseInference *)av_mallocz(sizeof(*base_inference));
@@ -35,6 +43,8 @@ int av_base_inference_set_params(FFBaseInference *base, FFInferenceParam *param)
     base->inference = (void *)FFInferenceImplCreate(base);
     base->initialized = TRUE;
     base->post_proc = (void *)getPostProcFunctionByName(base->inference_id, base->param.model);
+
+    set_log_function(ff_log_function);
 
     return 0;
 }
