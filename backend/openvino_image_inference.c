@@ -42,8 +42,8 @@ static void GetNextImageBuffer(ImageInferenceContext *ctx, const BatchRequest *r
     infer_request_get_blob_dims(request->infer_request, input_name, &blob_dims);
 
     memset(image, 0, sizeof(*image));
-    image->width = blob_dims.dims[2];
-    image->height = blob_dims.dims[3];
+    image->width = blob_dims.dims[3];  // W
+    image->height = blob_dims.dims[2]; // H
     image->format = FOURCC_RGBP;
     batchIndex = request->buffers.num_buffers;
     plane_size = image->width * image->height;
@@ -153,11 +153,17 @@ static void SubmitImageSoftwarePreProcess(ImageInferenceContext *ctx, const Batc
 static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType type, const char *devices,
                                         const char *model, int batch_size, int nireq, const char *configs,
                                         void *allocator, CallbackFunc callback) {
+    int ret = 0;
     OpenVINOImageInference *vino = (OpenVINOImageInference *)ctx->priv;
     VAII_DEBUG("Create");
 
     if (!model || !devices) {
         VAII_ERROR("No model or device!");
+        return -1;
+    }
+
+    if (!callback) {
+        VAII_ERROR("Callback function is not assigned!");
         return -1;
     }
 
@@ -274,10 +280,14 @@ static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType t
         goto err;
     }
 
-    pthread_mutex_init(&vino->flush_mutex, NULL);
-
     vino->callback = callback;
-    pthread_create(&vino->working_thread, NULL, WorkingFunction, ctx);
+    ret = pthread_create(&vino->working_thread, NULL, WorkingFunction, ctx);
+    if (ret != 0) {
+        VAII_ERROR("Create thread error!");
+        goto err;
+    }
+
+    pthread_mutex_init(&vino->flush_mutex, NULL);
 
     return 0;
 err:
@@ -464,9 +474,8 @@ static void *WorkingFunction(void *arg) {
                 OpenVINOOutputBlob *vino_blob = (OpenVINOOutputBlob *)blob_ctx->priv;
                 infer_request_put_blob(vino_blob->blob);
                 output_blob_free(blob_ctx);
-                blob_array.num_blobs--;
             }
-            assert(blob_array.num_blobs == 0);
+            blob_array.num_blobs = 0;
             free(blob_array.output_blobs);
         } else {
             fprintf(stderr, "Inference Error: %d", sts);
