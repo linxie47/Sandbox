@@ -356,6 +356,7 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
         full_frame_meta.y = 0;
         full_frame_meta.w = frame->width;
         full_frame_meta.h = frame->height;
+        full_frame_meta.index = 0;
         av_dynarray_add(&metas.roi_metas, &metas.num_metas, &full_frame_meta);
     } else {
         BBoxesArray *bboxes = NULL;
@@ -377,6 +378,7 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
                 roi_meta->y = bboxes->bbox[i]->y_min;
                 roi_meta->w = bboxes->bbox[i]->x_max - bboxes->bbox[i]->x_min;
                 roi_meta->h = bboxes->bbox[i]->y_max - bboxes->bbox[i]->y_min;
+                roi_meta->index = i;
                 av_dynarray_add(&metas.roi_metas, &metas.num_metas, roi_meta);
             }
         }

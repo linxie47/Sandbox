@@ -70,7 +70,8 @@ struct __FFBaseInference {
 
 /* ROI for analytics */
 typedef struct __FFVideoRegionOfInterestMeta {
-    char type_name[16];
+    char type_name[16]; ///<! type name, e.g. face, vechicle etc.
+    unsigned int index; ///<! mark as the serial no. in side data
 
     unsigned int x;
     unsigned int y;
@@ -111,7 +112,7 @@ typedef enum {
 #define FF_TENSOR_MAX_RANK 8
 typedef struct _IETensorMeta {
     IEPrecision precision;           /**< tensor precision */
-    int rank;                        /**< tensor rank */
+    int ranks;                       /**< tensor rank */
     size_t dims[FF_TENSOR_MAX_RANK]; /**< array describing tensor's dimensions */
     IELayout layout;                 /**< tensor layout */
     char *layer_name;                /**< tensor output layer name */
@@ -157,6 +158,28 @@ typedef struct __InferenceROIArray {
     InferenceROI **infer_ROIs;
     int num_infer_ROIs;
 } InferenceROIArray;
+
+typedef struct InferClassification {
+    int detect_id;    ///< detected bbox index
+    char *name;       ///< class name, e.g. emotion, age
+    char *layer_name; ///< output layer name
+    char *model;      ///< model name
+    int label_id;     ///< label index in labels
+    float confidence;
+    float value;
+    AVBufferRef *label_buf;  ///< label buffer
+    AVBufferRef *tensor_buf; ///< output tensor buffer
+} InferClassification;
+
+/* dynamic classifications array */
+typedef struct ClassifyArray {
+    InferClassification **classifications;
+    int num;
+} ClassifyArray;
+
+typedef struct InferClassificationMeta {
+    ClassifyArray *c_array;
+} InferClassificationMeta;
 
 #define MAX_MODEL_OUTPUT 4
 struct __ModelOutputPostproc {
