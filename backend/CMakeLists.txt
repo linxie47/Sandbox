@@ -32,9 +32,10 @@ pkg_check_modules(SWSCALE REQUIRED "libswscale")
 include_directories(${SWSCALE_INCLUDE_DIRS})
 link_directories(${SWSCALE_LIBRARY_DIRS})
 
-pkg_check_modules(SWSCALE REQUIRED "libswscale")
-include_directories(${SWSCALE_INCLUDE_DIRS})
-link_directories(${SWSCALE_LIBRARY_DIRS})
+# json-c
+pkg_check_modules(JSONC REQUIRED "json-c")
+include_directories(${JSONC_INCLUDE_DIRS})
+link_directories(${JSONC_LIBRARY_DIRS})
 
 # dldt_c_api
 pkg_check_modules(DLDT_C_API REQUIRED "dldt_c_api")
@@ -58,6 +59,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_executable(${TARGET_NAME} ${HEADERS} ${SOURCES})
 
-target_link_libraries(${TARGET_NAME} pthread m ${DLDT_C_API_LIBRARIES})
+target_link_libraries(${TARGET_NAME} pthread m ${DLDT_C_API_LIBRARIES} ${JSONC_LIBRARIES})
 
 target_link_libraries(${TARGET_NAME} ${AVFORMAT_LIBRARIES} ${AVCODEC_LIBRARIES} ${AVFILTER_LIBRARIES} ${AVUTIL_LIBRARIES} ${SWSCALE_LIBRARIES})

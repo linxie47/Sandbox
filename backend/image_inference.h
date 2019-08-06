@@ -7,6 +7,7 @@
 #pragma once
 
 #include "image.h"
+#include "pre_proc.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,11 +59,17 @@ struct ImageInference {
     int (*Create)(ImageInferenceContext *ctx, MemoryType type, const char *devices, const char *model, int batch_size,
                   int nireq, const char *config, void *allocator, CallbackFunc callback);
 
+    /* create image inference engine w/ asynchronous input preprocessing */
+    int (*CreateAsyncPreproc)(ImageInferenceContext *async_preproc_context, ImageInferenceContext *inference_context,
+                              PreProcContext *preproc_context, int image_queue_size, void *opaque);
+
     /* submit image */
     void (*SubmitImage)(ImageInferenceContext *ctx, const Image *image, IFramePtr user_data,
                         PreProcessor pre_processor);
 
     const char *(*GetModelName)(ImageInferenceContext *ctx);
+
+    void (*GetModelInputInfo)(ImageInferenceContext *ctx, int *width, int *height, int *format);
 
     int (*IsQueueFull)(ImageInferenceContext *ctx);
 

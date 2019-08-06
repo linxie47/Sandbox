@@ -10,10 +10,16 @@
 #include <libavutil/frame.h>
 #include <stdint.h>
 
+#if CONFIG_VAAPI
+#include <libavutil/hwcontext_vaapi.h>
+#endif
+
 typedef enum {
     INFERENCE_EVENT_NONE,
     INFERENCE_EVENT_EOS,
 } FF_INFERENCE_EVENT;
+
+typedef enum { VPP_DEVICE_SW, VPP_DEVICE_HW } VPPDevice;
 
 #ifndef TRUE
 /** The TRUE value of a UBool @stable ICU 2.0 */
@@ -24,6 +30,8 @@ typedef enum {
 /** The FALSE value of a UBool @stable ICU 2.0 */
 #define FALSE 0
 #endif
+
+#define MOCKER_PRE_PROC_MAGIC 0x47474747
 
 typedef struct __FFBaseInference FFBaseInference;
 typedef struct __FFInferenceParam FFInferenceParam;
@@ -43,15 +51,17 @@ typedef struct __ModelOutputPostproc ModelOutputPostproc;
     int nireq;                                                                                                         \
     char *cpu_streams;                                                                                                 \
     char *infer_config;                                                                                                \
-    float threshold;
+    float threshold;                                                                                                   \
+    int realtime_qos;
 
 struct __FFInferenceParam {
     // exposed options
     FF_INFERENCE_OPTIONS
 
+    VPPDevice vpp_device; // VPPDevice default:SW
+    void *opaque;         // VADisplay for vaapi
+
     int is_full_frame;
-    ModelInputPreproc *model_preproc;
-    ModelOutputPostproc *model_postproc;
 };
 
 struct __FFBaseInference {
@@ -66,6 +76,8 @@ struct __FFBaseInference {
     void *pre_proc;         // type: PreProcFunction
     void *post_proc;        // type: PostProcFunction
     void *get_roi_pre_proc; // type: GetROIPreProcFunction
+
+    unsigned int num_skipped_frames;
 };
 
 /* ROI for analytics */
@@ -205,3 +217,4 @@ int av_base_inference_get_frame(void *ctx, FFBaseInference *base, AVFrame **fram
 int av_base_inference_frame_queue_empty(void *ctx, FFBaseInference *base);
 
 void av_base_inference_send_event(void *ctx, FFBaseInference *base, FF_INFERENCE_EVENT event);
+

@@ -8,13 +8,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern PreProc pre_proc_ffmpeg;
+extern PreProc pre_proc_swscale;
 extern PreProc pre_proc_opencv;
 extern PreProc pre_proc_gapi;
+extern PreProc pre_proc_vaapi;
+extern PreProc pre_proc_mocker;
 
 static const PreProc *const pre_proc_list[] = {
 #if HAVE_FFMPEG || CONFIG_SWSCALE
-    &pre_proc_ffmpeg,
+    &pre_proc_swscale,
 #endif
 #if HAVE_OPENCV
     &pre_proc_opencv,
@@ -22,7 +24,10 @@ static const PreProc *const pre_proc_list[] = {
 #if HAVE_GAPI
     &pre_proc_gapi,
 #endif
-    NULL};
+#if CONFIG_VAAPI
+    &pre_proc_vaapi,
+#endif
+    &pre_proc_mocker,  NULL};
 
 int GetPlanesCount(int fourcc) {
     switch (fourcc) {
@@ -42,6 +47,7 @@ int GetPlanesCount(int fourcc) {
 
     return 0;
 }
+
 static const PreProc *pre_proc_iterate(void **opaque) {
     uintptr_t i = (uintptr_t)*opaque;
     const PreProc *pp = pre_proc_list[i];
@@ -70,7 +76,7 @@ const PreProc *pre_proc_get_by_type(MemoryType type) {
     const PreProc *ret = NULL;
 
     if (type == MEM_TYPE_SYSTEM) {
-        ret = pre_proc_get_by_name("ffmpeg");
+        ret = pre_proc_get_by_name("swscale");
         if (!ret)
             ret = pre_proc_get_by_name("gapi");
         if (!ret)
@@ -103,7 +109,6 @@ PreProcContext *pre_proc_alloc(const PreProc *pre_proc) {
 
     return ret;
 err:
-    free(ret->priv);
     free(ret);
     return NULL;
 }

@@ -10,8 +10,10 @@
 
 extern OutputBlobMethod output_blob_method_openvino;
 extern ImageInference image_inference_openvino;
+extern ImageInference image_inference_async_preproc;
 
-static const ImageInference *const image_inference_list[] = {&image_inference_openvino, NULL};
+static const ImageInference *const image_inference_list[] = {&image_inference_openvino, &image_inference_async_preproc,
+                                                             NULL};
 static const OutputBlobMethod *const output_blob_method_list[] = {&output_blob_method_openvino, NULL};
 
 static const ImageInference *image_inference_iterate(void **opaque) {

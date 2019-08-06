@@ -11,16 +11,31 @@
 
 typedef struct PreProcContext PreProcContext;
 
+typedef struct PreProcInitParam {
+    union {
+        struct { // VAAPI
+            void *va_display;
+            int num_surfaces;
+            int width;
+            int height;
+            int format; // FourCC
+        };
+        void *reserved; // Others
+    };
+} PreProcInitParam;
+
 typedef struct PreProc {
     /* image pre processing module name. Must be non-NULL and unique among pre processing modules. */
     const char *name;
+
+    int (*Init)(PreProcContext *context, PreProcInitParam *param);
 
     void (*Destroy)(PreProcContext *context);
 
     void (*Convert)(PreProcContext *context, const Image *src, Image *dst, int bAllocateDestination);
 
     // to be called if Convert called with bAllocateDestination = true
-    void (*ReleaseImage)(PreProcContext *context, const Image *dst);
+    void (*ReleaseImage)(PreProcContext *context, Image *dst);
 
     MemoryType mem_type;
 
