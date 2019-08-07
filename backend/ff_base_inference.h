@@ -105,8 +105,8 @@ struct __OutputPostproc {
     char *attribute_name;
     char *method;
     double threshold;
-    double tensor2text_scale;
-    int tensor2text_precision;
+    double tensor_to_text_scale;
+    int tensor_to_text_precision;
     AVBufferRef *labels;
 };
 

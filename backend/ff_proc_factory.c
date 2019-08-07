@@ -515,8 +515,8 @@ static int tensor_to_text(FFVideoRegionOfInterestMeta *meta, OutputPostproc *pos
     if (!blob_data)
         return -1;
 
-    if (post_proc->tensor2text_scale != 0)
-        scale = post_proc->tensor2text_scale;
+    if (post_proc->tensor_to_text_scale != 0)
+        scale = post_proc->tensor_to_text_scale;
 
     classification->detect_id = meta->index;
     classification->name = post_proc->attribute_name;

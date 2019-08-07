@@ -160,7 +160,7 @@ int model_proc_parse_input_preproc(const void *json, ModelInputPreproc *m_prepro
 int model_proc_parse_output_postproc(const void *json, ModelOutputPostproc *m_postproc) {
     json_object *jvalue, *postproc;
     json_object *attribute, *converter, *labels, *layer, *method, *threshold;
-    json_object *tensor2text_scale, *tensor2text_precision;
+    json_object *tensor_to_text_scale, *tensor_to_text_precision;
     int ret;
     size_t jarraylen;
 
@@ -202,9 +202,9 @@ int model_proc_parse_output_postproc(const void *json, ModelOutputPostproc *m_po
         FETCH_STRING(converter, converter);
 
         FETCH_DOUBLE(threshold, threshold);
-        FETCH_DOUBLE(tensor2text_scale, tensor2text_scale);
+        FETCH_DOUBLE(tensor_to_text_scale, tensor_to_text_scale);
 
-        FETCH_INTEGER(tensor2text_precision, tensor2text_precision);
+        FETCH_INTEGER(tensor_to_text_precision, tensor_to_text_precision);
 
         // handle labels
         ret = json_object_object_get_ex(jvalue, "labels", &labels);

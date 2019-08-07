@@ -1,1 +1,2 @@
 #define CONFIG_SWSCALE 1
+#define CONFIG_VAAPI 1

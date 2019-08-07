@@ -81,7 +81,7 @@ static int ImageInferenceAsyncPreprocCreate(ImageInferenceContext *async_preproc
             preproc_image->img_map_ctx = image_map_alloc(image_map_get_by_name("mocker"));
         else
             preproc_image->img_map_ctx = image_map_alloc(image_map_get_by_name("vaapi"));
-
+        assert(preproc_image->img_map_ctx);
         async_preproc->preproc_images[n] = preproc_image;
         SafeQueuePush(async_preproc->freeImages, preproc_image);
     }
