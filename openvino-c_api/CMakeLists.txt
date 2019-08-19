@@ -86,8 +86,6 @@ install(TARGETS "${C_API_LIB}" DESTINATION "${CMAKE_INSTALL_FULL_LIBDIR}")
 
 set_target_properties("${C_API_LIB}"
     PROPERTIES
-    "CMAKE_CXX_FLAGS" "${CMAKE_CXX_FLAGS} -fPIE" COMPILE_PDB_NAME ${C_API_LIB}
-        SOVERSION "${C_API_VERSION_SO}"
-        VERSION "${PROJECT_VERSION}")
+    "CMAKE_CXX_FLAGS" "${CMAKE_CXX_FLAGS} -fPIE" COMPILE_PDB_NAME ${C_API_LIB})
 
 target_link_libraries("${C_API_LIB}" IE::ie_cpu_extension ${InferenceEngine_LIBRARIES})

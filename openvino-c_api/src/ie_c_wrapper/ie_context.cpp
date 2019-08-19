@@ -53,7 +53,7 @@ void CIEContext::loadModel(IEConfig * config)
         path.assign(config->pluginPath);
 
     InferenceEngine::PluginDispatcher dispatcher({ path, "../../../lib/intel64", "" });
-    targetDevice = getDeviceFromId(config->targetId);
+    targetDevice = (InferenceEngine::TargetDevice)config->targetId;
     /** Loading plugin for device **/
     plugin = dispatcher.getPluginByDevice(getDeviceName(targetDevice));
     enginePtr = plugin;
@@ -429,31 +429,6 @@ void * CIEContext::getOutput(unsigned int idx, unsigned int * size)
 
 InferenceEngine::TargetDevice CIEContext::getDeviceFromString(const std::string &deviceName) {
     return InferenceEngine::TargetDeviceInfo::fromStr(deviceName);
-}
-
-InferenceEngine::TargetDevice CIEContext::getDeviceFromId(IETargetDeviceType device) {
-    switch (device) {
-    case IE_Default:
-        return InferenceEngine::TargetDevice::eDefault;
-    case IE_Balanced:
-        return InferenceEngine::TargetDevice::eBalanced;
-    case IE_CPU:
-        return InferenceEngine::TargetDevice::eCPU;
-    case IE_GPU:
-        return InferenceEngine::TargetDevice::eGPU;
-    case IE_FPGA:
-        return InferenceEngine::TargetDevice::eFPGA;
-    case IE_MYRIAD:
-        return InferenceEngine::TargetDevice::eMYRIAD;
-    case IE_HDDL:
-        return InferenceEngine::TargetDevice::eHDDL;
-    case IE_GNA:
-        return InferenceEngine::TargetDevice::eGNA;
-    case IE_HETERO:
-        return InferenceEngine::TargetDevice::eHETERO;
-    default:
-        return InferenceEngine::TargetDevice::eCPU;
-    }
 }
 
 InferenceEngine::Layout CIEContext::estimateLayout(const int chNum)

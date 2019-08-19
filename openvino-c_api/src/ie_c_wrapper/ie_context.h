@@ -178,11 +178,6 @@ protected:
     InferenceEngine::TargetDevice getDeviceFromString(const std::string &deviceName);
 
     /*
-    * @brief Converts enum value to TargetDevice
-    */
-    InferenceEngine::TargetDevice getDeviceFromId(IETargetDeviceType device);
-
-    /*
     * @brief estimate the data layout according to the channel number
     */
     InferenceEngine::Layout estimateLayout(const int chNum);
