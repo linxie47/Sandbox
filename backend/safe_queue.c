@@ -96,6 +96,14 @@ void *SafeQueuePop(SafeQueueT *sq) {
     return value;
 }
 
+int SafeQueueSize(SafeQueueT *sq) {
+    int size = 0;
+    mutex_lock(&sq->mutex);
+    size = queue_count(sq->q);
+    mutex_unlock(&sq->mutex);
+    return size;
+}
+
 int SafeQueueEmpty(SafeQueueT *sq) {
     int empty = 0;
     mutex_lock(&sq->mutex);

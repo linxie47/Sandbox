@@ -42,6 +42,11 @@ pkg_check_modules(DLDT_C_API REQUIRED "dldt_c_api")
 include_directories(${DLDT_C_API_INCLUDE_DIRS})
 link_directories(${DLDT_C_API_LIBRARY_DIRS})
 
+pkg_search_module(VA va libva REQUIRED)
+pkg_search_module(VADRM va-drm libva-drm REQUIRED)
+include_directories(${VA_INCLUDE_DIRS})
+include_directories(${VADRM_INCLUDE_DIRS})
+
 file (GLOB SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.c
     )
@@ -59,6 +64,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_executable(${TARGET_NAME} ${HEADERS} ${SOURCES})
 
-target_link_libraries(${TARGET_NAME} pthread m ${DLDT_C_API_LIBRARIES} ${JSONC_LIBRARIES})
+target_link_libraries(${TARGET_NAME} pthread m ${DLDT_C_API_LIBRARIES} ${JSONC_LIBRARIES} ${VA_LIBRARIES} ${VADRM_LIBRARIES})
 
 target_link_libraries(${TARGET_NAME} ${AVFORMAT_LIBRARIES} ${AVCODEC_LIBRARIES} ${AVFILTER_LIBRARIES} ${AVUTIL_LIBRARIES} ${SWSCALE_LIBRARIES})

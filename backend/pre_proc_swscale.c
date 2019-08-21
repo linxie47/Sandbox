@@ -6,6 +6,7 @@
 
 #include "pre_proc.h"
 #include <assert.h>
+#include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 // #define DEBUG
 
@@ -96,12 +97,16 @@ static inline enum AVPixelFormat FOURCC2FFmpegFormat(int format) {
 }
 
 typedef struct FFPreProc {
-    struct SwsContext *sws_context;
+    struct SwsContext *sws_context[3];
+    Image image_yuv;
+    Image image_bgr;
 } FFPreProc;
 
 static void FFPreProcConvert(PreProcContext *context, const Image *src, Image *dst, int bAllocateDestination) {
     FFPreProc *ff_pre_proc = (FFPreProc *)context->priv;
-    struct SwsContext *sws_context = ff_pre_proc->sws_context;
+    struct SwsContext **sws_context = ff_pre_proc->sws_context;
+    Image *image_yuv = &ff_pre_proc->image_yuv;
+    Image *image_bgr = &ff_pre_proc->image_bgr;
     uint8_t *gbr_planes[3] = {};
 
     // if identical format and resolution
@@ -126,29 +131,98 @@ static void FFPreProcConvert(PreProcContext *context, const Image *src, Image *d
 
         return;
     }
+#define PLANE_NUM 3
+    // init image YUV
+    if (image_yuv->width != dst->width || image_yuv->height != dst->height) {
+        int ret = 0;
+        image_yuv->width = dst->width;
+        image_yuv->height = dst->height;
+        image_yuv->format = src->format; // no CSC for the 1st stage
 
-    sws_context = sws_getCachedContext(sws_context, src->width, src->height, FOURCC2FFmpegFormat(src->format),
-                                       dst->width, dst->height, AV_PIX_FMT_GBRP, SWS_FAST_BILINEAR, NULL, NULL, NULL);
-    assert(sws_context);
+        if (image_yuv->planes[0])
+            av_freep(&image_yuv->planes[0]);
+        ret = av_image_alloc(image_yuv->planes, image_yuv->stride, image_yuv->width, image_yuv->height,
+                             FOURCC2FFmpegFormat(image_yuv->format), 16);
+        if (ret < 0) {
+            fprintf(stderr, "Alloc yuv image buffer error!\n");
+            assert(0);
+        }
+    }
+
+    // init image BGR24
+    if (image_bgr->width != image_yuv->width || image_bgr->height != image_yuv->height) {
+        int ret = 0;
+        image_bgr->width = image_yuv->width;
+        image_bgr->height = image_yuv->height;
+        image_bgr->format = FOURCC_BGR; // YUV -> BGR packed for the 2nd stage
+
+        if (image_bgr->planes[0])
+            av_freep(&image_bgr->planes[0]);
+        ret = av_image_alloc(image_bgr->planes, image_bgr->stride, image_bgr->width, image_bgr->height,
+                             FOURCC2FFmpegFormat(image_bgr->format), 16);
+        if (ret < 0) {
+            fprintf(stderr, "Alloc bgr image buffer error!\n");
+            assert(0);
+        }
+    }
+
+    sws_context[0] = sws_getCachedContext(sws_context[0], src->width, src->height, FOURCC2FFmpegFormat(src->format),
+                                          image_yuv->width, image_yuv->height, FOURCC2FFmpegFormat(image_yuv->format),
+                                          SWS_FAST_BILINEAR, NULL, NULL, NULL);
+    sws_context[1] = sws_getCachedContext(sws_context[1], image_yuv->width, image_yuv->height,
+                                          FOURCC2FFmpegFormat(image_yuv->format), image_bgr->width, image_bgr->height,
+                                          FOURCC2FFmpegFormat(image_bgr->format), SWS_FAST_BILINEAR, NULL, NULL, NULL);
+    sws_context[2] = sws_getCachedContext(sws_context[2], image_bgr->width, image_bgr->height,
+                                          FOURCC2FFmpegFormat(image_bgr->format), dst->width, dst->height,
+                                          AV_PIX_FMT_GBRP, SWS_FAST_BILINEAR, NULL, NULL, NULL);
+
+    for (int i = 0; i < 3; i++)
+        assert(sws_context[i]);
+
     // BGR->GBR
     gbr_planes[0] = dst->planes[1];
     gbr_planes[1] = dst->planes[0];
     gbr_planes[2] = dst->planes[2];
-    if (!sws_scale(sws_context, (const uint8_t *const *)src->planes, src->stride, 0, src->height, gbr_planes,
-                   dst->stride)) {
-        fprintf(stderr, "Error on FFMPEG sws_scale\n");
+
+    // stage 1: yuv -> yuv, resize to dst size
+    if (!sws_scale(sws_context[0], (const uint8_t *const *)src->planes, src->stride, 0, src->height,
+                   image_yuv->planes, image_yuv->stride)) {
+        fprintf(stderr, "Error on FFMPEG sws_scale stage 1\n");
         assert(0);
     }
+    // stage 2: yuv -> bgr packed, no resize
+    if (!sws_scale(sws_context[1], (const uint8_t *const *)image_yuv->planes, image_yuv->stride, 0, image_yuv->height,
+                   image_bgr->planes, image_bgr->stride)) {
+        fprintf(stderr, "Error on FFMPEG sws_scale stage 2\n");
+        assert(0);
+    }
+    // stage 3: bgr -> gbr planer, no resize
+    if (!sws_scale(sws_context[2], (const uint8_t *const *)image_bgr->planes, image_bgr->stride, 0, image_bgr->height,
+                   gbr_planes, dst->stride)) {
+        fprintf(stderr, "Error on FFMPEG sws_scale stage 3\n");
+        assert(0);
+    }
+
     /* dump pre-processed image to file */
     // DumpBGRpToFile(dst);
-    ff_pre_proc->sws_context = sws_context;
 }
 
 static void FFPreProcDestroy(PreProcContext *context) {
     FFPreProc *ff_pre_proc = (FFPreProc *)context->priv;
-    if (ff_pre_proc->sws_context) {
-        sws_freeContext(ff_pre_proc->sws_context);
-        ff_pre_proc->sws_context = NULL;
+
+    for (int i = 0; i < 3; i++) {
+        if (ff_pre_proc->sws_context[i]) {
+            sws_freeContext(ff_pre_proc->sws_context[i]);
+            ff_pre_proc->sws_context[i] = NULL;
+        }
+    }
+    if (ff_pre_proc->image_yuv.planes[0]) {
+        av_freep(&ff_pre_proc->image_yuv.planes[0]);
+        ff_pre_proc->image_yuv.planes[0] = NULL;
+    }
+    if (ff_pre_proc->image_bgr.planes[0]) {
+        av_freep(&ff_pre_proc->image_bgr.planes[0]);
+        ff_pre_proc->image_bgr.planes[0] = NULL;
     }
 }
 

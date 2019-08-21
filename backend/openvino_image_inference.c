@@ -403,8 +403,10 @@ static void OpenVINOImageInferenceFlush(ImageInferenceContext *ctx) {
         // push the last request to infer
         infer_request_infer_async(request->infer_request);
         SafeQueuePush(vino->workingRequests, request);
+        SafeQueueWaitEmpty(vino->workingRequests);
+    } else {
+        SafeQueuePush(vino->freeRequests, request);
     }
-    SafeQueueWaitEmpty(vino->workingRequests);
 
     pthread_mutex_unlock(&vino->flush_mutex);
 }

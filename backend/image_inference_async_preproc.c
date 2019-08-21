@@ -152,6 +152,7 @@ static void ImageInferenceAsyncPreprocClose(ImageInferenceContext *ctx) {
     ImageInferenceAsyncPreproc *async_preproc = (ImageInferenceAsyncPreproc *)ctx->priv;
     ImageInferenceContext *infer_ctx = async_preproc->actual;
     const ImageInference *infer = infer_ctx->inference;
+    PreProcContext *pp_ctx = async_preproc->pre_proc;
 
     if (async_preproc->async_thread) {
         // add one empty request
@@ -163,13 +164,13 @@ static void ImageInferenceAsyncPreprocClose(ImageInferenceContext *ctx) {
 
     for (size_t n = 0; n < async_preproc->num_preproc_images; n++) {
         PreprocImage *pp_image = async_preproc->preproc_images[n];
-        PreProcContext *pp_ctx = async_preproc->pre_proc;
         pp_ctx->pre_proc->ReleaseImage(pp_ctx, &pp_image->image);
     }
 
     infer->Close(infer_ctx);
     image_inference_free(infer_ctx);
-    pre_proc_free(async_preproc->pre_proc);
+    pp_ctx->pre_proc->Destroy(pp_ctx);
+    pre_proc_free(pp_ctx);
 
     PreprocImagesFree(async_preproc->preproc_images, async_preproc->num_preproc_images);
 

@@ -11,15 +11,22 @@
 #include <libavutil/avassert.h>
 #include <libavutil/mem.h>
 
-static void ff_log_function(int level, const char *file, const char *function, int line, const char *message) {
-    int log_levels[] = {AV_LOG_QUIET, AV_LOG_ERROR, AV_LOG_WARNING, AV_LOG_VERBOSE, AV_LOG_INFO,
-                        AV_LOG_DEBUG, AV_LOG_INFO,  AV_LOG_TRACE,   AV_LOG_PANIC};
+static const int log_levels[] = {AV_LOG_QUIET,   AV_LOG_ERROR, AV_LOG_WARNING, AV_LOG_INFO,
+                                 AV_LOG_VERBOSE, AV_LOG_DEBUG, AV_LOG_TRACE,   AV_LOG_PANIC};
 
+static void ff_log_function(int level, const char *file, const char *function, int line, const char *message) {
     av_log(NULL, log_levels[level], "%s:%i : %s \t %s \n", file, line, function, message);
+}
+
+static void ff_trace_function(int level, const char *fmt, va_list vl) {
+    av_vlog(NULL, log_levels[level], fmt, vl);
 }
 
 FFBaseInference *av_base_inference_create(const char *inference_id) {
     FFBaseInference *base_inference = (FFBaseInference *)av_mallocz(sizeof(*base_inference));
+
+    set_log_function(ff_log_function);
+    set_trace_function(ff_trace_function);
 
     base_inference->inference_id = inference_id ? av_strdup(inference_id) : NULL;
 
@@ -47,8 +54,6 @@ int av_base_inference_set_params(FFBaseInference *base, FFInferenceParam *param)
     base->inference = (void *)FFInferenceImplCreate(base);
     base->initialized = TRUE;
     base->post_proc = (void *)getPostProcFunctionByName(base->inference_id, base->param.model);
-
-    set_log_function(ff_log_function);
 
     return 0;
 }

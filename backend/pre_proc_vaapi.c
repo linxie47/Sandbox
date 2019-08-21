@@ -92,7 +92,7 @@ static int VAAPIPreProcInit(PreProcContext *context, PreProcInitParam *param) {
     vaapi_pre_proc->va_context = va_context;
 
     for (int i = 0; i < vaapi_pre_proc->nb_formats; i++) {
-        if (vaapi_pre_proc->format_list[i].fourcc == VA_RT_FORMAT_RGBP) {
+        if (vaapi_pre_proc->format_list[i].fourcc == VA_FOURCC_RGBP) {
             vaapi_pre_proc->va_format_selected = vaapi_pre_proc->format_list[i];
             break;
         }
@@ -200,7 +200,7 @@ static Image VAAPIMap(ImageMapContext *context, const Image *image) {
                                     .va_reserved = {}};
     }
 
-    // VA_CALL(vaSyncSurface(va_display, image->surface_id));
+    VA_CALL(vaSyncSurface(va_display, image->surface_id));
 
     if (va_format.fourcc &&
         vaCreateImage(va_display, &va_format, image->width, image->height, &va_image) == VA_STATUS_SUCCESS) {
