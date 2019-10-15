@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #include "ff_inference_impl.h"
 #include "ff_base_inference.h"
@@ -125,16 +139,12 @@ static inline int avFormatToFourCC(int format) {
         return FOURCC_RGBP;
     }
 
-    av_log(NULL, AV_LOG_ERROR, "Unsupported AV Format: %d.", format);
+    VAII_LOGE("Unsupported AV Format: %d.", format);
     return 0;
 }
 
 static void ff_buffer_map(AVFrame *frame, Image *image, MemoryType memoryType) {
     const int n_planes = 4;
-    if (n_planes > MAX_PLANES_NUMBER) {
-        av_log(NULL, AV_LOG_ERROR, "Planes number %d isn't supported.", n_planes);
-        av_assert0(0);
-    }
 
     image->type = memoryType;
     image->format = avFormatToFourCC(frame->format);
@@ -247,8 +257,8 @@ static Model *CreateModel(FFBaseInference *base, const char *model_file, const c
     const OutputBlobMethod *method = output_blob_method_get_by_name("openvino");
     ImageInferenceContext *context = NULL;
 
-    av_log(NULL, AV_LOG_INFO, "Loading model: device=%s, path=%s\n", base->param.device, model_file);
-    av_log(NULL, AV_LOG_INFO, "Setting batch_size=%d, nireq=%d\n", base->param.batch_size, base->param.nireq);
+    VAII_LOGI("Loading model: device=%s, path=%s\n", base->param.device, model_file);
+    VAII_LOGI("Setting batch_size=%d, nireq=%d\n", base->param.batch_size, base->param.nireq);
 
     context = image_inference_alloc(inference, method, "ffmpeg-image-infer");
     model = (Model *)av_mallocz(sizeof(*model));
@@ -257,19 +267,18 @@ static Model *CreateModel(FFBaseInference *base, const char *model_file, const c
     if (model_proc_path) {
         void *proc = model_proc_read_config_file(model_proc_path);
         if (!proc) {
-            av_log(NULL, AV_LOG_ERROR,
-                   "Could not read proc config file:"
+            VAII_LOGE("Could not read proc config file:"
                    "%s\n",
                    model_proc_path);
             av_assert0(proc);
         }
 
         if (model_proc_parse_input_preproc(proc, &model->model_preproc) < 0) {
-            av_log(NULL, AV_LOG_ERROR, "Parse input preproc error.\n");
+            VAII_ERROR("Parse input preproc error.\n");
         }
 
         if (model_proc_parse_output_postproc(proc, &model->model_postproc) < 0) {
-            av_log(NULL, AV_LOG_ERROR, "Parse output postproc error.\n");
+            VAII_ERROR("Parse output postproc error.\n");
         }
 
         model->proc_config = proc;
@@ -429,11 +438,19 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
 
     // Collect all ROI metas into ROIMetaArray
     if (base_inference->param.is_full_frame) {
-        full_frame_meta.x = 0;
-        full_frame_meta.y = 0;
-        full_frame_meta.w = frame->width;
-        full_frame_meta.h = frame->height;
-        full_frame_meta.index = 0;
+        if (base_inference->crop_full_frame) {
+            full_frame_meta.x = base_inference->param.crop_rect.x;
+            full_frame_meta.y = base_inference->param.crop_rect.y;
+            full_frame_meta.w = base_inference->param.crop_rect.width;
+            full_frame_meta.h = base_inference->param.crop_rect.height;
+            full_frame_meta.index = 0;
+        } else {
+            full_frame_meta.x = 0;
+            full_frame_meta.y = 0;
+            full_frame_meta.w = frame->width;
+            full_frame_meta.h = frame->height;
+            full_frame_meta.index = 0;
+        }
         av_dynarray_add(&metas.roi_metas, &metas.num_metas, &full_frame_meta);
     } else {
         BBoxesArray *bboxes = NULL;
@@ -450,6 +467,8 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
                     if (!CheckObjectClass(model_preproc->object_class, bboxes->bbox[i]))
                         continue;
                     roi_meta = (FFVideoRegionOfInterestMeta *)av_malloc(sizeof(*roi_meta));
+                    if (roi_meta == NULL)
+                        goto exit;
                     roi_meta->x = bboxes->bbox[i]->x_min;
                     roi_meta->y = bboxes->bbox[i]->y_min;
                     roi_meta->w = bboxes->bbox[i]->x_max - bboxes->bbox[i]->x_min;
@@ -479,6 +498,10 @@ int FFInferenceImplAddFrame(void *ctx, FFInferenceImpl *impl, AVFrame *frame) {
         }
 
         output_frame = (OutputFrame *)av_malloc(sizeof(*output_frame));
+        if (output_frame == NULL) {
+            pthread_mutex_unlock(&impl->output_frames_mutex);
+            goto exit;
+        }
         output_frame->frame = frame;
         output_frame->writable_frame = NULL; // TODO: alloc new frame if not writable
         output_frame->inference_count = inference_count;
@@ -521,8 +544,12 @@ int FFInferenceImplGetFrame(void *ctx, FFInferenceImpl *impl, AVFrame **frame) {
 size_t FFInferenceImplGetQueueSize(void *ctx, FFInferenceImpl *impl) {
     ff_list_t *out = impl->output_frames;
     ff_list_t *pro = impl->processed_frames;
-    av_log(ctx, AV_LOG_INFO, "output:%zu processed:%zu\n", out->size(out), pro->size(pro));
+    VAII_LOGI("output:%zu processed:%zu\n", out->size(out), pro->size(pro));
     return out->size(out) + pro->size(pro);
+}
+
+size_t FFInferenceImplResourceStatus(void *ctx, FFInferenceImpl *impl) {
+    return impl->model->infer_ctx->inference->ResourceStatus(impl->model->infer_ctx);
 }
 
 void FFInferenceImplSinkEvent(void *ctx, FFInferenceImpl *impl, FF_INFERENCE_EVENT event) {

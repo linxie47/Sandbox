@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #include <assert.h>
 #include <string.h>
@@ -140,11 +154,21 @@ static int ImageInferenceAsyncPreprocIsQueueFull(ImageInferenceContext *ctx) {
     return infer->IsQueueFull(infer_ctx);
 }
 
+static int ImageInferenceResourceStatus(ImageInferenceContext *ctx) {
+    ImageInferenceAsyncPreproc *async_preproc = (ImageInferenceAsyncPreproc *)ctx->priv;
+    ImageInferenceContext *infer_ctx = async_preproc->actual;
+    return infer_ctx->inference->ResourceStatus(infer_ctx);
+}
+
 static void ImageInferenceAsyncPreprocFlush(ImageInferenceContext *ctx) {
     ImageInferenceAsyncPreproc *async_preproc = (ImageInferenceAsyncPreproc *)ctx->priv;
 
     ImageInferenceContext *infer_ctx = async_preproc->actual;
     const ImageInference *infer = infer_ctx->inference;
+    // Since async image preproc is working in another independent thread,
+    // have to wait for all working images be processed and sent to inference engine,
+    // or the flushing cannot assure the un-batched frames can be used and released
+    SafeQueueWaitEmpty(async_preproc->workingImages);
     return infer->Flush(infer_ctx);
 }
 
@@ -188,6 +212,8 @@ static void *AsyncPreprocWorkingFunction(void *arg) {
 
     while (1) {
         PreprocImage *pp_image = (PreprocImage *)SafeQueueFront(async_preproc->workingImages);
+        assert(pp_image);
+
         // empty ctx means ending
         if (!pp_image->img_map_ctx)
             break;
@@ -213,6 +239,7 @@ ImageInference image_inference_async_preproc = {
     .SubmitImage = ImageInferenceAsyncPreprocSubmtImage,
     .GetModelName = ImageInferenceAsyncPreprocGetModelName,
     .IsQueueFull = ImageInferenceAsyncPreprocIsQueueFull,
+    .ResourceStatus = ImageInferenceResourceStatus,
     .Flush = ImageInferenceAsyncPreprocFlush,
     .Close = ImageInferenceAsyncPreprocClose,
 };

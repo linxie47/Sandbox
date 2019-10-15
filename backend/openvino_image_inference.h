@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #pragma once
 
@@ -20,11 +34,12 @@ typedef struct BatchRequest {
 
 typedef struct OpenVINOImageInference {
     int resize_by_inference;
+    IEColorFormat ie_color_format;
 
     CallbackFunc callback;
 
     // Inference Engine
-    ie_plugin_t *plugin;
+    ie_core_t *core;
     ie_network_t *network;
     ie_input_info_t **inputs;
     ie_output_info_t **outputs;

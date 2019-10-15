@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #include <assert.h>
 #include <string.h>
@@ -29,6 +43,28 @@ static inline int getNumberChannels(int format) {
         return 3;
     }
     return 0;
+}
+
+static IEColorFormat FormatNameToIEColorFormat(const char *format) {
+    static const char *formats[] = {"NV12", "RGB", "BGR", "RGBX", "BGRX", "RGBA", "BGRA"};
+    const IEColorFormat ie_color_formats[] = {NV12, RGB, BGR, RGBX, BGRX, RGBX, BGRX};
+
+    int num_formats = sizeof(formats) / sizeof(formats[0]);
+    for (int i = 0; i < num_formats; i++) {
+        if (!strcmp(format, formats[i]))
+            return ie_color_formats[i];
+    }
+
+    VAII_ERROR("Unsupported color format by Inference Engine preprocessing");
+    return RAW;
+}
+
+static inline void RectToIERoi(roi_t *roi, const Rectangle *rect) {
+    roi->id = 0;
+    roi->posX = rect->x;
+    roi->posY = rect->y;
+    roi->sizeX = rect->width;
+    roi->sizeY = rect->height;
 }
 
 static void GetNextImageBuffer(ImageInferenceContext *ctx, const BatchRequest *request, Image *image) {
@@ -128,7 +164,23 @@ static void SubmitImagePreProcess(ImageInferenceContext *ctx, const BatchRequest
     OpenVINOImageInference *vino = (OpenVINOImageInference *)ctx->priv;
 
     if (vino->resize_by_inference) {
-        // TODO: image to Blob
+        const char *input_name = vino->inputs[0]->name;
+        // ie preprocess can only support system memory right now
+        assert(pSrc->type == MEM_TYPE_SYSTEM);
+        if (pSrc->format != FOURCC_NV12) {
+            roi_t roi, *_roi = NULL;
+            if (pSrc->rect.width != 0 && pSrc->rect.height != 0) {
+                RectToIERoi(&roi, &pSrc->rect);
+                _roi = &roi;
+            }
+            infer_request_set_blob(request->infer_request, input_name, pSrc->width, pSrc->height, vino->ie_color_format,
+                                   (uint8_t **)pSrc->planes, _roi);
+        } else {
+            Image src = {};
+            src = ApplyCrop(pSrc);
+            infer_request_set_blob(request->infer_request, input_name, src.width, src.height, vino->ie_color_format,
+                                   src.planes, NULL);
+        }
     } else {
         Image src = {};
         Image dst = {};
@@ -160,7 +212,7 @@ static void SubmitImagePreProcess(ImageInferenceContext *ctx, const BatchRequest
 static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType type, const char *devices,
                                         const char *model, int batch_size, int nireq, const char *configs,
                                         void *allocator, CallbackFunc callback) {
-    int ret = 0;
+    int ret = 0, cpu_extension_needed = 0;
     OpenVINOImageInference *vino = (OpenVINOImageInference *)ctx->priv;
     VAII_DEBUG("Create");
 
@@ -174,35 +226,41 @@ static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType t
         return -1;
     }
 
-    vino->plugin = ie_plugin_create(devices);
-    if (!vino->plugin) {
-        VAII_ERROR("Create plugin failed!");
+    vino->core = ie_core_create();
+    if (!vino->core) {
+        VAII_ERROR("Create ie core failed!");
         return -1;
     }
 
     if (configs) {
-        const char *resize_by_vino = NULL;
-        ie_plugin_set_config(vino->plugin, configs);
-        // printf("KEY_CPU_THREADS_NUM:%s\n", ie_plugin_get_config(vino->plugin, KEY_CPU_THREADS_NUM));
-        // printf("KEY_CPU_THROUGHPUT_STREAMS:%s\n", ie_plugin_get_config(vino->plugin, KEY_CPU_THROUGHPUT_STREAMS));
-        resize_by_vino = ie_plugin_get_config(vino->plugin, KEY_RESIZE_BY_INFERENCE);
-        vino->resize_by_inference = (resize_by_vino && !strcmp(resize_by_vino, "TRUE")) ? 1 : 0;
+        const char *pre_processor_name = NULL, *multi_device_list = NULL, *hetero_device_list = NULL;
+
+        ie_core_set_config(vino->core, configs, devices);
+        pre_processor_name = ie_core_get_config(vino->core, KEY_PRE_PROCESSOR_TYPE);
+        vino->resize_by_inference = (pre_processor_name && !strcmp(pre_processor_name, "ie")) ? 1 : 0;
+
+        multi_device_list = ie_core_get_config(vino->core, "MULTI_DEVICE_PRIORITIES");
+        hetero_device_list = ie_core_get_config(vino->core, "TARGET_FALLBACK");
+        if (multi_device_list && strstr(multi_device_list, "CPU") ||
+            hetero_device_list && strstr(hetero_device_list, "CPU")) {
+            cpu_extension_needed = 1;
+        }
     }
 
     // Extension for custom layers
-    if (strstr(devices, "CPU")) {
-        const char *cpu_ext = ie_plugin_get_config(vino->plugin, KEY_CPU_EXTENSION);
-        ie_plugin_add_cpu_extension(vino->plugin, cpu_ext);
+    if (cpu_extension_needed || strstr(devices, "CPU")) {
+        const char *cpu_ext = ie_core_get_config(vino->core, KEY_CPU_EXTENSION);
+        ie_core_add_extension(vino->core, cpu_ext, "CPU");
+        VAII_DEBUG("Cpu extension loaded!");
     }
 
     // Load network
-    vino->network = ie_network_create(vino->plugin, model, NULL);
+    vino->network = ie_network_create(vino->core, model, NULL);
     if (!vino->network) {
         VAII_ERROR("Create network failed!");
         goto err;
     }
 
-    ie_network_set_batch(vino->network, batch_size);
     vino->batch_size = batch_size;
 
     // Check model input
@@ -219,6 +277,8 @@ static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType t
         VAII_ERROR("Alloc in/outputs ptr failed!");
         goto err;
     }
+    memset(vino->inputs,  0, vino->num_inputs *  sizeof(*vino->inputs));
+    memset(vino->outputs, 0, vino->num_outputs * sizeof(*vino->outputs));
 
     for (size_t i = 0; i < vino->num_inputs; i++) {
         vino->inputs[i] = (ie_input_info_t *)malloc(sizeof(*vino->inputs[i]));
@@ -234,14 +294,24 @@ static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType t
     }
 
     ie_network_get_all_inputs(vino->network, vino->inputs);
+
+    if (batch_size > 1) {
+        for (int i = 0; i < vino->num_inputs; i++)
+            ie_network_input_reshape(vino->network, vino->inputs[i], batch_size);
+    }
+
     ie_network_get_all_outputs(vino->network, vino->outputs);
 
     ie_input_info_set_precision(vino->inputs[0], "U8");
+    ie_input_info_set_layout(vino->inputs[0], "NCHW");
     if (vino->resize_by_inference) {
-        // TODO: set openvino preprocess algorithm
-        ie_input_info_set_layout(vino->inputs[0], "NHWC");
-    } else {
-        ie_input_info_set_layout(vino->inputs[0], "NCHW");
+        const char *image_format_name = ie_core_get_config(vino->core, KEY_IMAGE_FORMAT);
+        if (image_format_name == NULL) {
+            VAII_ERROR("Input image format name must be specified!");
+            goto err;
+        }
+        vino->ie_color_format = FormatNameToIEColorFormat(image_format_name);
+        ie_input_info_set_preprocess(vino->inputs[0], vino->network, RESIZE_BILINEAR, vino->ie_color_format);
     }
 
     // Create infer requests
@@ -250,7 +320,7 @@ static int OpenVINOImageInferenceCreate(ImageInferenceContext *ctx, MemoryType t
         goto err;
     }
 
-    vino->infer_requests = ie_network_create_infer_requests(vino->network, nireq);
+    vino->infer_requests = ie_network_create_infer_requests(vino->network, nireq, devices);
     if (!vino->infer_requests) {
         VAII_ERROR("Creat infer requests failed!");
         goto err;
@@ -322,7 +392,7 @@ err:
     if (vino->workingRequests)
         SafeQueueDestroy(vino->workingRequests);
     ie_network_destroy(vino->network);
-    ie_plugin_destroy(vino->plugin);
+    ie_core_destroy(vino->core);
     return -1;
 }
 
@@ -383,6 +453,11 @@ static void OpenVINOImageInferenceGetModelInputInfo(ImageInferenceContext *ctx, 
 static int OpenVINOImageInferenceIsQueueFull(ImageInferenceContext *ctx) {
     OpenVINOImageInference *vino = (OpenVINOImageInference *)ctx->priv;
     return SafeQueueEmpty(vino->freeRequests);
+}
+
+static int OpenVINOImageInferenceResourceStatus(ImageInferenceContext *ctx) {
+    OpenVINOImageInference *vino = (OpenVINOImageInference *)ctx->priv;
+    return SafeQueueSize(vino->freeRequests) * vino->batch_size;
 }
 
 static void OpenVINOImageInferenceFlush(ImageInferenceContext *ctx) {
@@ -457,7 +532,7 @@ static void OpenVINOImageInferenceClose(ImageInferenceContext *ctx) {
     }
 
     ie_network_destroy(vino->network);
-    ie_plugin_destroy(vino->plugin);
+    ie_core_destroy(vino->core);
 }
 
 static void *WorkingFunction(void *arg) {
@@ -469,6 +544,7 @@ static void *WorkingFunction(void *arg) {
     for (;;) {
         IEStatusCode sts;
         BatchRequest *request = (BatchRequest *)SafeQueueFront(vino->workingRequests);
+        assert(request);
         VAII_DEBUG("loop");
         if (!request->buffers.num_buffers) {
             break;
@@ -562,6 +638,7 @@ ImageInference image_inference_openvino = {
     .GetModelName = OpenVINOImageInferenceGetModelName,
     .GetModelInputInfo = OpenVINOImageInferenceGetModelInputInfo,
     .IsQueueFull = OpenVINOImageInferenceIsQueueFull,
+    .ResourceStatus = OpenVINOImageInferenceResourceStatus,
     .Flush = OpenVINOImageInferenceFlush,
     .Close = OpenVINOImageInferenceClose,
 };

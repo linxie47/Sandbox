@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 
     printf("Pass!\n");
 
-    FFBaseInference *infer_base = av_base_inference_create("ie_detect");
+    FFBaseInference *infer_base = av_base_inference_create("detect");
 
     FFInferenceParam infer_param = {};
 

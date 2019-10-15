@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #pragma once
 
@@ -21,3 +35,5 @@ int model_proc_parse_output_postproc(const void *json, ModelOutputPostproc *m_po
 void model_proc_release_model_proc(const void *json, ModelInputPreproc *preproc, ModelOutputPostproc *postproc);
 
 int model_proc_get_file_size(FILE *fp);
+
+void infer_labels_buffer_free(void *opaque, uint8_t *data);

@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #pragma once
 
@@ -73,6 +87,8 @@ struct ImageInference {
 
     int (*IsQueueFull)(ImageInferenceContext *ctx);
 
+    int (*ResourceStatus)(ImageInferenceContext *ctx);
+
     void (*Flush)(ImageInferenceContext *ctx);
 
     void (*Close)(ImageInferenceContext *ctx);
@@ -127,7 +143,8 @@ __DECLARE_CONFIG_KEY(RESIZE_BY_INFERENCE);    // experimental, don't use
 #define KEY_CPU_EXTENSION __STRING(CPU_EXTENSION)                   // library with implementation of custom layers
 #define KEY_CPU_THREADS_NUM __STRING(CPU_THREADS_NUM)               // threads number CPU plugin use for inference
 #define KEY_CPU_THROUGHPUT_STREAMS __STRING(CPU_THROUGHPUT_STREAMS) // number inference requests running in parallel
-#define KEY_RESIZE_BY_INFERENCE __STRING(RESIZE_BY_INFERENCE)       // experimental, don't use
+#define KEY_PRE_PROCESSOR_TYPE __STRING(PRE_PROCESSOR_TYPE)         // preprocessor, e.g. ie, ffmpeg, opencv, g-api etc.
+#define KEY_IMAGE_FORMAT __STRING(IMAGE_FORMAT)                     // image format, e.g. NV12, BGR, RGB etc.
 #endif
 
 const ImageInference *image_inference_get_by_name(const char *name);

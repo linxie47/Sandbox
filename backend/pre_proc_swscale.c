@@ -1,10 +1,25 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #include "pre_proc.h"
+#include "logger.h"
 #include <assert.h>
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
@@ -72,7 +87,7 @@ static void DumpRGBpToFile(const Image *out_image) {
 }
 
 static inline void DumpImageInfo(const Image *p) {
-    av_log(NULL, AV_LOG_INFO, "Image w:%d h:%d f:%x, plane: %p %p %p  stride: %d %d %d \n", p->width, p->height,
+    VAII_LOGI("Image w:%d h:%d f:%x, plane: %p %p %p  stride: %d %d %d \n", p->width, p->height,
            p->format, p->planes[0], p->planes[1], p->planes[2], p->stride[0], p->stride[1], p->stride[2]);
 }
 
@@ -107,7 +122,7 @@ static void FFPreProcConvert(PreProcContext *context, const Image *src, Image *d
     struct SwsContext **sws_context = ff_pre_proc->sws_context;
     Image *image_yuv = &ff_pre_proc->image_yuv;
     Image *image_bgr = &ff_pre_proc->image_bgr;
-    uint8_t *gbr_planes[3] = {};
+    uint8_t *gbr_planes[4] = {};
 
     // if identical format and resolution
     if (src->format == dst->format && src->format == FOURCC_RGBP && src->width == dst->width &&

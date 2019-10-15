@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #pragma once
 
@@ -61,6 +75,7 @@ struct __FFInferenceParam {
     VPPDevice vpp_device; // VPPDevice default:SW
     void *opaque;         // VADisplay for vaapi
 
+    Rectangle crop_rect;
     int is_full_frame;
 };
 
@@ -72,6 +87,7 @@ struct __FFBaseInference {
 
     // other fields
     int initialized;
+    int crop_full_frame;    // crop needed for full frame
     void *inference;        // type: FFInferenceImpl*
     void *pre_proc;         // type: PreProcFunction
     void *post_proc;        // type: PostProcFunction
@@ -176,6 +192,7 @@ typedef struct InferClassification {
     char *name;       ///< class name, e.g. emotion, age
     char *layer_name; ///< output layer name
     char *model;      ///< model name
+    char *attributes;
     int label_id;     ///< label index in labels
     float confidence;
     float value;
@@ -216,5 +233,6 @@ int av_base_inference_get_frame(void *ctx, FFBaseInference *base, AVFrame **fram
 
 int av_base_inference_frame_queue_empty(void *ctx, FFBaseInference *base);
 
-void av_base_inference_send_event(void *ctx, FFBaseInference *base, FF_INFERENCE_EVENT event);
+int av_base_inference_resource_status(void *ctx, FFBaseInference *base);
 
+void av_base_inference_send_event(void *ctx, FFBaseInference *base, FF_INFERENCE_EVENT event);

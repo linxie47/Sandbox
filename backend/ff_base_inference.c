@@ -1,8 +1,22 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #include "ff_base_inference.h"
 #include "ff_inference_impl.h"
@@ -24,6 +38,8 @@ static void ff_trace_function(int level, const char *fmt, va_list vl) {
 
 FFBaseInference *av_base_inference_create(const char *inference_id) {
     FFBaseInference *base_inference = (FFBaseInference *)av_mallocz(sizeof(*base_inference));
+    if (base_inference == NULL)
+        return NULL;
 
     set_log_function(ff_log_function);
     set_trace_function(ff_trace_function);
@@ -54,6 +70,9 @@ int av_base_inference_set_params(FFBaseInference *base, FFInferenceParam *param)
     base->inference = (void *)FFInferenceImplCreate(base);
     base->initialized = TRUE;
     base->post_proc = (void *)getPostProcFunctionByName(base->inference_id, base->param.model);
+    base->crop_full_frame =
+        (!param->crop_rect.x && !param->crop_rect.y && !param->crop_rect.width && !param->crop_rect.height) ? FALSE
+                                                                                                            : TRUE;
 
     return 0;
 }
@@ -94,6 +113,13 @@ int av_base_inference_frame_queue_empty(void *ctx, FFBaseInference *base) {
         return AVERROR(EINVAL);
 
     return FFInferenceImplGetQueueSize(ctx, (FFInferenceImpl *)base->inference) == 0 ? TRUE : FALSE;
+}
+
+int av_base_inference_resource_status(void *ctx, FFBaseInference *base) {
+    if (!base)
+        return AVERROR(EINVAL);
+
+    return FFInferenceImplResourceStatus(ctx, (FFInferenceImpl *)base->inference);
 }
 
 void av_base_inference_send_event(void *ctx, FFBaseInference *base, FF_INFERENCE_EVENT event) {

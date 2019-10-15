@@ -1,24 +1,27 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #include "model_proc.h"
 #include "libavutil/avassert.h"
+#include "logger.h"
 #include <json-c/json.h>
-
-static void infer_labels_buffer_free(void *opaque, uint8_t *data) {
-    int i;
-    LabelsArray *labels = (LabelsArray *)data;
-
-    for (i = 0; i < labels->num; i++)
-        av_freep(&labels->label[i]);
-
-    av_free(labels->label);
-
-    av_free(data);
-}
 
 // helper functions
 static void infer_labels_dump(uint8_t *data) {
@@ -28,6 +31,18 @@ static void infer_labels_dump(uint8_t *data) {
     for (i = 0; i < labels->num; i++)
         printf("%s ", labels->label[i]);
     printf("\n");
+}
+
+void infer_labels_buffer_free(void *opaque, uint8_t *data) {
+    int i;
+    LabelsArray *labels = (LabelsArray *)data;
+
+    for (i = 0; i < labels->num; i++)
+        av_freep(&labels->label[i]);
+
+    av_free(labels->label);
+
+    av_free(data);
 }
 
 int model_proc_get_file_size(FILE *fp) {
@@ -115,7 +130,7 @@ int model_proc_parse_input_preproc(const void *json, ModelInputPreproc *m_prepro
 
     ret = json_object_object_get_ex((json_object *)json, "input_preproc", &preproc);
     if (!ret) {
-        av_log(NULL, AV_LOG_DEBUG, "No input_preproc.\n");
+        VAII_DEBUG("No input_preproc.\n");
         return 0;
     }
 
@@ -129,7 +144,7 @@ int model_proc_parse_input_preproc(const void *json, ModelInputPreproc *m_prepro
         if (json_object_get_string(color) == NULL)
             return -1;
 
-        av_log(NULL, AV_LOG_INFO, "Color Format:\"%s\"\n", json_object_get_string(color));
+        VAII_LOGI("Color Format:\"%s\"\n", json_object_get_string(color));
 
         if (!strcmp(json_object_get_string(color), "BGR"))
             m_preproc->color_format = AV_PIX_FMT_BGR24;
@@ -144,7 +159,7 @@ int model_proc_parse_input_preproc(const void *json, ModelInputPreproc *m_prepro
         if (json_object_get_string(object_class) == NULL)
             return -1;
 
-        av_log(NULL, AV_LOG_INFO, "Object_class:\"%s\"\n", json_object_get_string(object_class));
+        VAII_LOGI("Object_class:\"%s\"\n", json_object_get_string(object_class));
 
         m_preproc->object_class = (char *)json_object_get_string(object_class);
     }
@@ -166,7 +181,7 @@ int model_proc_parse_output_postproc(const void *json, ModelOutputPostproc *m_po
 
     ret = json_object_object_get_ex((json_object *)json, "output_postproc", &postproc);
     if (!ret) {
-        av_log(NULL, AV_LOG_DEBUG, "No output_postproc.\n");
+        VAII_DEBUG("No output_postproc.\n");
         return 0;
     }
 

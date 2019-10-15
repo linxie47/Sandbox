@@ -1,10 +1,25 @@
-/*******************************************************************************
- * Copyright (C) 2018-2019 Intel Corporation
+/*
+ * Copyright (c) 2018-2019 Intel Corporation
  *
- * SPDX-License-Identifier: MIT
- ******************************************************************************/
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
 
 #include "ff_proc_factory.h"
+#include "logger.h"
 #include <libavutil/avassert.h>
 #include <math.h>
 
@@ -34,6 +49,7 @@ static void infer_classify_metadata_buffer_free(void *opaque, uint8_t *data) {
     if (classes) {
         for (i = 0; i < classes->num; i++) {
             InferClassification *c = classes->classifications[i];
+            av_freep(&c->attributes);
             av_buffer_unref(&c->label_buf);
             av_buffer_unref(&c->tensor_buf);
             av_freep(&c);
@@ -51,7 +67,7 @@ static int get_unbatched_size_in_bytes(OutputBlobContext *blob_ctx, size_t batch
     Dimensions *dim = blob->GetDims(blob_ctx);
 
     if (dim->dims[0] != batch_size) {
-        av_log(NULL, AV_LOG_ERROR, "Blob last dimension should be equal to batch size");
+        VAII_ERROR("Blob last dimension should be equal to batch size");
         av_assert0(0);
     }
     size = dim->dims[1];
@@ -148,9 +164,10 @@ static void ParseYOLOV3Output(OutputBlobContext *blob_ctx, int image_width, int 
         anchor_offset = 2 * 0;
         break;
     default:
-        av_log(NULL, AV_LOG_ERROR, "Invalid output size\n");
+        VAII_ERROR("Invaild output size\n");
         return;
     }
+
     for (int i = 0; i < side_square; ++i) {
         int row = i / side;
         int col = i % side;
@@ -177,9 +194,14 @@ static void ParseYOLOV3Output(OutputBlobContext *blob_ctx, int image_width, int 
                     continue;
                 obj = av_mallocz(sizeof(*obj));
                 av_assert0(obj);
-                DetectionObjectInit(obj, x, y, height, width, j, prob,
+                if (!base->crop_full_frame)
+                    DetectionObjectInit(obj, x, y, height, width, j, prob,
                                     (float)(image_height) / (float)(YOLOV3_INPUT_SIZE),
                                     (float)(image_width) / (float)(YOLOV3_INPUT_SIZE));
+                else
+                    DetectionObjectInit(obj, x, y, height, width, j, prob,
+                                    (float)(base->param.crop_rect.height) / (float)(YOLOV3_INPUT_SIZE),
+                                    (float)(base->param.crop_rect.width) / (float)(YOLOV3_INPUT_SIZE));
                 av_dynarray_add(&objects->objects, &objects->num_detection_objects, obj);
             }
         }
@@ -192,6 +214,7 @@ static void ExtractYOLOV3BoundingBoxes(const OutputBlobArray *blob_array, Infere
     DetectionObjectArray obj_array = {};
     BBoxesArray *boxes;
     AVBufferRef *ref;
+    AVBufferRef *labels = NULL;
     AVFrame *av_frame;
     AVFrameSideData *side_data;
     InferDetectionMeta *detect_meta;
@@ -201,6 +224,15 @@ static void ExtractYOLOV3BoundingBoxes(const OutputBlobArray *blob_array, Infere
 
     for (int n = 0; n < blob_array->num_blobs; n++) {
         OutputBlobContext *blob_ctx = blob_array->output_blobs[n];
+        const OutputBlobMethod *blob = blob_ctx->output_blob_method;
+        const char *layer_name = blob->GetOutputLayerName(blob_ctx);
+
+        if (model_postproc) {
+            int idx = findModelPostProcByName(model_postproc, layer_name);
+            if (idx != MAX_MODEL_OUTPUT)
+                labels = model_postproc->procs[idx].labels;
+        }
+
         av_assert0(blob_ctx);
         ParseYOLOV3Output(blob_ctx, infer_roi_array->infer_ROIs[0]->roi.w, infer_roi_array->infer_ROIs[0]->roi.h,
                           &obj_array, ff_base_inference);
@@ -228,18 +260,30 @@ static void ExtractYOLOV3BoundingBoxes(const OutputBlobArray *blob_array, Infere
         new_bbox = (InferDetection *)av_mallocz(sizeof(*new_bbox));
         av_assert0(new_bbox);
 
-        new_bbox->x_min = object->xmin;
-        new_bbox->y_min = object->ymin;
-        new_bbox->x_max = object->xmax;
-        new_bbox->y_max = object->ymax;
+        if (!ff_base_inference->crop_full_frame) {
+            new_bbox->x_min = object->xmin;
+            new_bbox->y_min = object->ymin;
+            new_bbox->x_max = object->xmax;
+            new_bbox->y_max = object->ymax;
+        } else {
+            int x_offset = ff_base_inference->param.crop_rect.x;
+            int y_offset = ff_base_inference->param.crop_rect.y;
+            new_bbox->x_min = object->xmin + x_offset;
+            new_bbox->y_min = object->ymin + y_offset;
+            new_bbox->x_max = object->xmax + x_offset;
+            new_bbox->y_max = object->ymax + y_offset;
+        }
         new_bbox->confidence = object->confidence;
         new_bbox->label_id = object->class_id;
 
-        //// TODO: handle label
-        // if (labels)
+        new_bbox->x_min = new_bbox->x_min < 0 ? 0 : new_bbox->x_min;
+        new_bbox->y_min = new_bbox->y_min < 0 ? 0 : new_bbox->y_min;
+
+        if (labels)
+            new_bbox->label_buf = av_buffer_ref(labels);
 
         av_dynarray_add(&boxes->bbox, &boxes->num, new_bbox);
-        av_log(NULL, AV_LOG_TRACE, "bbox %d %d %d %d\n", (int)new_bbox->x_min, (int)new_bbox->y_min,
+        VAII_LOGD("bbox %d %d %d %d\n", (int)new_bbox->x_min, (int)new_bbox->y_min,
                (int)new_bbox->x_max, (int)new_bbox->y_max);
     }
 
@@ -250,7 +294,7 @@ static void ExtractYOLOV3BoundingBoxes(const OutputBlobArray *blob_array, Infere
     ref = av_buffer_create((uint8_t *)detect_meta, sizeof(*detect_meta), &infer_detect_metadata_buffer_free, NULL, 0);
     if (!ref) {
         infer_detect_metadata_buffer_free(NULL, (uint8_t *)detect_meta);
-        av_log(NULL, AV_LOG_ERROR, "Create buffer ref failed.\n");
+        VAII_ERROR("Create buffer ref failed.\n");
         av_assert0(0);
     }
 
@@ -290,12 +334,12 @@ static void ExtractBoundingBoxes(const OutputBlobArray *blob_array, InferenceROI
             max_proposal_count = dim->dims[2];
             break;
         default:
-            av_log(NULL, AV_LOG_ERROR, "Unsupported output layout, boxes won't be extracted\n");
+            VAII_ERROR("Unsupported output layout, boxes won't be extracted\n");
             continue;
         }
 
         if (object_size != 7) { // SSD DetectionOutput format
-            av_log(NULL, AV_LOG_ERROR, "Unsupported output dimensions, boxes won't be extracted\n");
+            VAII_ERROR("Unsupported output dimensions, boxes won't be extracted\n");
             continue;
         }
 
@@ -385,7 +429,7 @@ static void ExtractBoundingBoxes(const OutputBlobArray *blob_array, InferenceROI
                 av_buffer_unref(&ref);
                 av_assert0(sd);
             }
-            av_log(NULL, AV_LOG_DEBUG, "av_frame:%p sd:%d\n", av_frame, av_frame->nb_side_data);
+            VAII_LOGD("av_frame:%p sd:%d\n", av_frame, av_frame->nb_side_data);
         }
 
         av_free(boxes);
@@ -404,7 +448,7 @@ static int CreateNewClassifySideData(AVFrame *frame, InferClassificationMeta *cl
     new_sd = av_frame_new_side_data_from_buf(frame, AV_FRAME_DATA_INFERENCE_CLASSIFICATION, ref);
     if (!new_sd) {
         av_buffer_unref(&ref);
-        av_log(NULL, AV_LOG_ERROR, "Could not add new side data\n");
+        VAII_ERROR("Could not add new side data\n");
         return AVERROR(ENOMEM);
     }
 
@@ -414,12 +458,11 @@ static int CreateNewClassifySideData(AVFrame *frame, InferClassificationMeta *cl
 static av_cold void dump_softmax(char *name, int label_id, float conf, AVBufferRef *label_buf) {
     LabelsArray *array = (LabelsArray *)label_buf->data;
 
-    av_log(NULL, AV_LOG_DEBUG, "CLASSIFY META - Label id:%d %s:%s Conf:%f\n", label_id, name, array->label[label_id],
-           conf);
+    VAII_LOGD("CLASSIFY META - Label id:%d %s:%s Conf:%f\n", label_id, name, array->label[label_id], conf);
 }
 
 static av_cold void dump_tensor_value(char *name, float value) {
-    av_log(NULL, AV_LOG_DEBUG, "CLASSIFY META - %s:%1.2f\n", name, value);
+    VAII_LOGD("CLASSIFY META - %s:%1.2f\n", name, value);
 }
 
 static void find_max_element_index(const float *array, int len, int *index, float *value) {
@@ -467,8 +510,10 @@ static int attributes_to_text(FFVideoRegionOfInterestMeta *meta, OutputPostproc 
         int i;
         double threshold = 0.5;
         float confidence = 0;
-        char attributes[4096] = {};
         LabelsArray *array;
+        classification->attributes = av_mallocz(4096*sizeof(char));
+        if (classification->attributes == NULL)
+            return -1;
 
         if (post_proc->threshold != 0)
             threshold = post_proc->threshold;
@@ -476,7 +521,7 @@ static int attributes_to_text(FFVideoRegionOfInterestMeta *meta, OutputPostproc 
         array = (LabelsArray *)post_proc->labels->data;
         for (i = 0; i < array->num; i++) {
             if (blob_data[i] >= threshold)
-                strncat(attributes, array->label[i], (strlen(array->label[i]) + 1));
+                strncat(classification->attributes, array->label[i], (strlen(array->label[i]) + 1));
             if (blob_data[i] > confidence)
                 confidence = blob_data[i];
         }
@@ -484,23 +529,25 @@ static int attributes_to_text(FFVideoRegionOfInterestMeta *meta, OutputPostproc 
         classification->name = post_proc->attribute_name;
         classification->confidence = confidence;
 
-        av_log(NULL, AV_LOG_DEBUG, "Attributes: %s\n", attributes);
+        VAII_LOGD("Attributes: %s\n", classification->attributes);
     } else if (method_index) {
         int i;
-        char attributes[1024] = {};
         LabelsArray *array;
+        classification->attributes = av_mallocz(4096*sizeof(char));
+        if (classification->attributes == NULL)
+            return -1;
 
         array = (LabelsArray *)post_proc->labels->data;
         for (i = 0; i < array->num; i++) {
             int value = blob_data[i];
             if (value < 0 || value >= array->num)
                 break;
-            strncat(attributes, array->label[value], (strlen(array->label[value]) + 1));
+            strncat(classification->attributes, array->label[value], (strlen(array->label[value]) + 1));
         }
 
         classification->name = post_proc->attribute_name;
 
-        av_log(NULL, AV_LOG_DEBUG, "Attributes: %s\n", attributes);
+        VAII_LOGD("Attributes: %s\n", classification->attributes);
     }
 
     return 0;
@@ -589,7 +636,8 @@ static void Blob2RoiMeta(const OutputBlobArray *blob_array, InferenceROIArray *i
                     tensor_to_text(meta, post_proc, (void *)(data + b * size), dimensions, classification,
                                    classify_meta);
                 } else {
-                    av_log(NULL, AV_LOG_ERROR, "Undefined converter:%s\n", post_proc->converter);
+                    VAII_LOGE("Undefined converter:%s\n", post_proc->converter);
+                    av_free(classification);
                     break;
                 }
             } else {
@@ -610,12 +658,12 @@ PostProcFunction getPostProcFunctionByName(const char *name, const char *model) 
     if (name == NULL || model == NULL)
         return NULL;
 
-    if (!strcmp(name, "ie_detect")) {
+    if (!strcmp(name, "detect")) {
         if (strstr(model, "yolo"))
             return (PostProcFunction)ExtractYOLOV3BoundingBoxes;
         else
             return (PostProcFunction)ExtractBoundingBoxes;
-    } else if (!strcmp(name, "ie_classify")) {
+    } else if (!strcmp(name, "classify")) {
         return (PostProcFunction)Blob2RoiMeta;
     }
     return NULL;
@@ -633,6 +681,6 @@ int findModelPostProcByName(ModelOutputPostproc *model_postproc, const char *lay
             return proc_id;
     }
 
-    av_log(NULL, AV_LOG_DEBUG, "Could not find proc:%s\n", layer_name);
+    VAII_LOGD("Could not find proc:%s\n", layer_name);
     return proc_id;
 }
